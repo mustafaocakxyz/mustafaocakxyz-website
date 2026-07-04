@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import styled, { css } from 'styled-components';
 import { blueButtonGradient, pageBackground } from '../styles/theme';
+import { submitBasvuru } from '../lib/submitBasvuru';
 import { AytBilgileriStep } from './AytBilgileriStep';
 import { AytKaynaklariStep } from './AytKaynaklariStep';
 import { TytKaynaklariStep } from './TytKaynaklariStep';
@@ -232,7 +233,7 @@ const FormShell = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-family: 'Mont', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 `;
 
 const FormContainer = styled.div`
@@ -484,9 +485,50 @@ const NextButton = styled.button`
   }
 `;
 
+const ErrorMessage = styled.p`
+  margin: 12px 0 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(211, 47, 47, 0.15);
+  border: 1px solid rgba(244, 67, 54, 0.35);
+  color: rgba(255, 200, 200, 0.95);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-align: center;
+`;
+
+const SuccessPanel = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: 40px 20px;
+`;
+
+const SuccessTitle = styled.h2`
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0;
+`;
+
+const SuccessText = styled.p`
+  font-size: 1rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0;
+  max-width: 360px;
+`;
+
 export function OnboardingForm() {
   const [currentStep, setCurrentStep] = useState(0);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const step = STEPS[currentStep];
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === TOTAL_STEPS - 1;
@@ -609,13 +651,44 @@ export function OnboardingForm() {
     return null;
   };
 
-  const goNext = () => {
-    if (!isLastStep) setCurrentStep((s) => s + 1);
+  const goNext = async () => {
+    if (isLastStep) {
+      setSubmitError(null);
+      setIsSubmitting(true);
+      try {
+        await submitBasvuru(formValues);
+        setIsSubmitted(true);
+      } catch (err) {
+        setSubmitError(
+          err instanceof Error ? err.message : 'Gönderim başarısız.',
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    setCurrentStep((s) => s + 1);
   };
 
   const goBack = () => {
     if (!isFirstStep) setCurrentStep((s) => s - 1);
   };
+
+  if (isSubmitted) {
+    return (
+      <FormShell>
+        <FormContainer>
+          <SuccessPanel>
+            <SuccessTitle>Başvurun alındı</SuccessTitle>
+            <SuccessText>
+              Formunu başarıyla gönderdik. En kısa sürede seninle iletişime geçeceğiz.
+            </SuccessText>
+          </SuccessPanel>
+        </FormContainer>
+      </FormShell>
+    );
+  }
 
   return (
     <FormShell>
@@ -647,14 +720,15 @@ export function OnboardingForm() {
         </StepContent>
 
         <FormFooter>
-          <BackButton type="button" onClick={goBack} disabled={isFirstStep}>
+          <BackButton type="button" onClick={goBack} disabled={isFirstStep || isSubmitting}>
             <ChevronLeft size={20} />
           </BackButton>
-          <NextButton type="button" onClick={goNext}>
-            {isLastStep ? 'Gönder' : 'Devam'}
-            {!isLastStep && <ChevronRight size={20} />}
+          <NextButton type="button" onClick={goNext} disabled={isSubmitting}>
+            {isSubmitting ? 'Gönderiliyor...' : isLastStep ? 'Gönder' : 'Devam'}
+            {!isLastStep && !isSubmitting && <ChevronRight size={20} />}
           </NextButton>
         </FormFooter>
+        {submitError && <ErrorMessage>{submitError}</ErrorMessage>}
       </FormContainer>
     </FormShell>
   );

@@ -17,7 +17,7 @@ const baseButton = css`
   cursor: pointer;
   transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
   margin-top: 40px;
-  font-family: 'Mont', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   animation: fadeInUp 0.8s ease-out both;
   animation-delay: 1.6s;
 

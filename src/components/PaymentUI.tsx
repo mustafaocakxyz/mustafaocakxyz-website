@@ -98,7 +98,7 @@ const actionButtonStyles = css`
   text-decoration: none;
   font-size: 1rem;
   font-weight: 500;
-  font-family: 'Mont', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   border: none;
   cursor: pointer;
   white-space: nowrap;

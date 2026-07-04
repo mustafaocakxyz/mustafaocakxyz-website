@@ -9,7 +9,7 @@ export const HomeLayout = styled.div`
   align-items: center;
   justify-content: center;
   padding: 20px;
-  font-family: 'Mont', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   gap: 60px;
 
   @media (max-width: 768px) {
@@ -26,7 +26,7 @@ export const DetailLayout = styled.div`
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  font-family: 'Mont', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 `;
 
 export const CardStack = styled.div`
