@@ -5,6 +5,7 @@ import { HomePage } from './pages/HomePage';
 import { TekSeferlikPage } from './pages/TekSeferlikPage';
 import { TekSeferlikPaymentPage } from './pages/TekSeferlikPaymentPage';
 import { TekSeferlikHavalePage } from './pages/TekSeferlikHavalePage';
+import { OnboardingFormPage } from './pages/OnboardingFormPage';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/tek-seferlik/odeme" element={<TekSeferlikPaymentPage />} />
         <Route path="/tek-seferlik/odeme/havale" element={<TekSeferlikHavalePage />} />
         <Route path="/gelisim-programi" element={<GelisimProgramiPage />} />
+        <Route path="/basvuru" element={<OnboardingFormPage />} />
       </Routes>
     </BrowserRouter>
   );
