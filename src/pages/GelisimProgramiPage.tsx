@@ -1,35 +1,18 @@
-import { Calendar, CheckCircle, Layers, Sparkles } from 'lucide-react';
-import { DetailPage } from './DetailPage';
-
-const features = [
-  {
-    text: 'Haftalık oturumlarla düzenli ilerleme sağlarsın. (placeholder)',
-    icon: Layers,
-  },
-  {
-    text: 'Kişisel hedeflerine göre yapılandırılmış bir yol haritası. (placeholder)',
-    icon: Sparkles,
-  },
-  {
-    text: 'Her aşamada ölçülebilir gelişim takibi. (placeholder)',
-    icon: CheckCircle,
-  },
-  {
-    text: 'Program süresi ve başlangıç tarihi birlikte planlanır. (placeholder)',
-    icon: Calendar,
-  },
-];
+import { LandingBackButton } from '../components/gelisim/LandingBackButton';
+import { ProgramSection } from '../components/gelisim/ProgramSection';
+import { LandingContent, LandingLayout } from '../components/gelisim/LandingLayout';
+import { GELISIM_PROGRAM_SECTIONS } from '../data/gelisimProgramiContent';
 
 export function GelisimProgramiPage() {
   return (
-    <DetailPage
-      title="Gelişim Programı"
-      features={features}
-      ctaLabel="Programa Başvur"
-      theme="orange"
-      onCtaClick={() => {
-        window.alert('CTA placeholder — bağlantı buraya eklenecek.');
-      }}
-    />
+    <LandingLayout>
+      <LandingContent>
+        <LandingBackButton />
+
+        {GELISIM_PROGRAM_SECTIONS.map((section) => (
+          <ProgramSection key={section.title} section={section} />
+        ))}
+      </LandingContent>
+    </LandingLayout>
   );
 }

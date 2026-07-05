@@ -1,5 +1,7 @@
-import styled, { css } from 'styled-components';
+import styled from 'styled-components';
 import { branchFieldId, getAytBranches } from '../data/aytBranches';
+import { useFormTheme } from './FormThemeContext';
+import { getFormAccent } from '../styles/formTheme';
 
 const AYT_PLACEHOLDER = 'Bu dersteki netini veya güncel durumunu yaz';
 
@@ -21,11 +23,11 @@ const FieldLabel = styled.label`
   color: rgba(255, 255, 255, 0.75);
 `;
 
-const fieldControlStyles = css`
+const FieldInput = styled.input<{ $theme: ReturnType<typeof getFormAccent> }>`
   width: 100%;
   padding: 16px 18px;
   border-radius: 14px;
-  border: 1px solid rgba(66, 165, 245, 0.25);
+  border: 1px solid ${({ $theme }) => $theme.inputBorder};
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.95);
   font-size: 1rem;
@@ -38,21 +40,17 @@ const fieldControlStyles = css`
   }
 
   &:focus {
-    border-color: rgba(66, 165, 245, 0.6);
+    border-color: ${({ $theme }) => $theme.inputBorderFocus};
     background: rgba(255, 255, 255, 0.08);
   }
 `;
 
-const FieldInput = styled.input`
-  ${fieldControlStyles}
-`;
-
-const EmptyState = styled.p`
+const EmptyState = styled.p<{ $theme: ReturnType<typeof getFormAccent> }>`
   margin: 0;
   padding: 20px;
   border-radius: 14px;
-  border: 1px dashed rgba(66, 165, 245, 0.35);
-  background: rgba(21, 101, 192, 0.12);
+  border: 1px dashed ${({ $theme }) => $theme.emptyBorder};
+  background: ${({ $theme }) => $theme.emptyBg};
   color: rgba(255, 255, 255, 0.75);
   font-size: 0.95rem;
   line-height: 1.6;
@@ -69,11 +67,13 @@ export function AytBilgileriStep({
   formValues,
   onFieldChange,
 }: AytBilgileriStepProps) {
+  const theme = useFormTheme();
+  const accent = getFormAccent(theme);
   const branches = getAytBranches(alan);
 
   if (branches.length === 0) {
     return (
-      <EmptyState>
+      <EmptyState $theme={accent}>
         AYT sorularını görmek için 1. adımda alan seçimi yapmalısın.
       </EmptyState>
     );
@@ -87,6 +87,7 @@ export function AytBilgileriStep({
           <FieldGroup key={id}>
             <FieldLabel htmlFor={id}>{branch} Netiniz / Durumunuz</FieldLabel>
             <FieldInput
+              $theme={accent}
               id={id}
               name={id}
               type="text"

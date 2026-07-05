@@ -1,6 +1,45 @@
 import styled, { css } from 'styled-components';
 import { Link } from 'react-router-dom';
-import { blueButtonGradient } from '../styles/theme';
+import {
+  blueButtonGradient,
+  orangeButtonGradient,
+  type ThemeColor,
+} from '../styles/theme';
+
+export type PaymentTheme = ThemeColor;
+
+const paymentThemeStyles = {
+  blue: {
+    subtitleGradient: `linear-gradient(135deg, #64b5f6 0%, #42a5f5 40%, #2196f3 100%)`,
+    subtitleShadow: '0 0 24px rgba(33, 150, 243, 0.25)',
+    surfaceBackground: `linear-gradient(
+      135deg,
+      rgba(21, 101, 192, 0.25) 0%,
+      rgba(25, 118, 210, 0.15) 100%
+    )`,
+    surfaceBorder: 'rgba(66, 165, 245, 0.25)',
+    buttonGradient: blueButtonGradient,
+    buttonShadow: '0 8px 25px rgba(21, 101, 192, 0.3)',
+    buttonShadowHover: '0 12px 35px rgba(21, 101, 192, 0.4)',
+  },
+  orange: {
+    subtitleGradient: `linear-gradient(135deg, #ffab91 0%, #ff8a65 40%, #f4511e 100%)`,
+    subtitleShadow: '0 0 24px rgba(244, 81, 30, 0.25)',
+    surfaceBackground: `linear-gradient(
+      135deg,
+      rgba(191, 54, 12, 0.25) 0%,
+      rgba(230, 74, 25, 0.15) 100%
+    )`,
+    surfaceBorder: 'rgba(255, 138, 101, 0.25)',
+    buttonGradient: orangeButtonGradient,
+    buttonShadow: '0 8px 25px rgba(216, 67, 21, 0.3)',
+    buttonShadowHover: '0 12px 35px rgba(216, 67, 21, 0.4)',
+  },
+} as const;
+
+function getPaymentTheme(theme: PaymentTheme = 'blue') {
+  return paymentThemeStyles[theme];
+}
 
 const fadeInUp = css`
   animation: fadeInUp 0.8s ease-out both;
@@ -25,16 +64,16 @@ export const PaymentContent = styled.div`
   gap: 20px;
 `;
 
-export const ProductSubtitle = styled.h2`
+export const ProductSubtitle = styled.h2<{ $theme?: PaymentTheme }>`
   font-size: 1.6rem;
   font-weight: 700;
   text-align: center;
   margin: -20px 0 12px;
-  background: linear-gradient(135deg, #64b5f6 0%, #42a5f5 40%, #2196f3 100%);
+  background: ${({ $theme = 'blue' }) => getPaymentTheme($theme).subtitleGradient};
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 0 24px rgba(33, 150, 243, 0.25);
+  text-shadow: ${({ $theme = 'blue' }) => getPaymentTheme($theme).subtitleShadow};
   ${fadeInUp}
   animation-delay: 0.35s;
 
@@ -44,16 +83,12 @@ export const ProductSubtitle = styled.h2`
   }
 `;
 
-export const SurfaceCard = styled.div<{ $delay?: string }>`
+export const SurfaceCard = styled.div<{ $delay?: string; $theme?: PaymentTheme }>`
   width: 100%;
   padding: 24px 28px;
   border-radius: 20px;
-  background: linear-gradient(
-    135deg,
-    rgba(21, 101, 192, 0.25) 0%,
-    rgba(25, 118, 210, 0.15) 100%
-  );
-  border: 1px solid rgba(66, 165, 245, 0.25);
+  background: ${({ $theme = 'blue' }) => getPaymentTheme($theme).surfaceBackground};
+  border: 1px solid ${({ $theme = 'blue' }) => getPaymentTheme($theme).surfaceBorder};
   color: rgba(255, 255, 255, 0.9);
   ${fadeInUp}
   animation-delay: ${({ $delay }) => $delay ?? '0.4s'};
@@ -87,13 +122,13 @@ export const PaymentOptionLabel = styled.div`
   }
 `;
 
-const actionButtonStyles = css`
+const actionButtonStyles = css<{ $theme?: PaymentTheme }>`
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 12px 22px;
   border-radius: 30px;
-  background: ${blueButtonGradient};
+  background: ${({ $theme = 'blue' }) => getPaymentTheme($theme).buttonGradient};
   color: white;
   text-decoration: none;
   font-size: 1rem;
@@ -102,12 +137,12 @@ const actionButtonStyles = css`
   border: none;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: 0 8px 25px rgba(21, 101, 192, 0.3);
+  box-shadow: ${({ $theme = 'blue' }) => getPaymentTheme($theme).buttonShadow};
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 35px rgba(21, 101, 192, 0.4);
+    box-shadow: ${({ $theme = 'blue' }) => getPaymentTheme($theme).buttonShadowHover};
   }
 
   @media (max-width: 600px) {
@@ -115,11 +150,11 @@ const actionButtonStyles = css`
   }
 `;
 
-export const PaymentActionLink = styled.a`
+export const PaymentActionLink = styled.a<{ $theme?: PaymentTheme }>`
   ${actionButtonStyles}
 `;
 
-export const PaymentActionRouterLink = styled(Link)`
+export const PaymentActionRouterLink = styled(Link)<{ $theme?: PaymentTheme }>`
   ${actionButtonStyles}
 `;
 
@@ -158,22 +193,22 @@ export const WarningText = styled.p`
   color: rgba(255, 255, 255, 0.88);
 `;
 
-export const BackLink = styled(Link)`
+export const BackLink = styled(Link)<{ $theme?: PaymentTheme }>`
   margin-top: 12px;
   padding: 14px 24px;
   border-radius: 30px;
-  background: ${blueButtonGradient};
+  background: ${({ $theme = 'blue' }) => getPaymentTheme($theme).buttonGradient};
   color: white;
   text-decoration: none;
   font-size: 1rem;
   align-self: center;
-  box-shadow: 0 8px 25px rgba(21, 101, 192, 0.3);
+  box-shadow: ${({ $theme = 'blue' }) => getPaymentTheme($theme).buttonShadow};
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   ${fadeInUp}
   animation-delay: 0.8s;
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 35px rgba(21, 101, 192, 0.4);
+    box-shadow: ${({ $theme = 'blue' }) => getPaymentTheme($theme).buttonShadowHover};
   }
 `;

@@ -21,7 +21,6 @@ export function HomePage() {
           subtitle="YKS sürecini Mustafa Ocak ile birlikte götürmek isteyenler için. Hedefinize ulaşana kadar devam eder."
           theme="orange"
           icon={TrendingUp}
-          comingSoon
         />
       </CardStack>
     </HomeLayout>

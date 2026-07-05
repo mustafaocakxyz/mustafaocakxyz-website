@@ -106,90 +106,6 @@ const OrangeCard = styled(Link)`
   }
 `;
 
-const OrangeCardDisabled = styled.div`
-  ${baseCard}
-  background: ${orangeGradient};
-  box-shadow:
-    0 10px 30px rgba(216, 67, 21, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
-  animation-delay: 1.4s;
-  cursor: not-allowed;
-  pointer-events: none;
-
-  &:hover {
-    transform: none;
-  }
-`;
-
-const ComingSoonOverlay = styled.div`
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(20, 20, 20, 0.72);
-  border-radius: 20px;
-  pointer-events: none;
-  overflow: hidden;
-
-  @media (max-width: 768px) {
-    border-radius: 18px;
-  }
-
-  @media (max-width: 480px) {
-    border-radius: 16px;
-  }
-`;
-
-const ComingSoonTape = styled.div`
-  width: 100%;
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(
-    180deg,
-    #bf360c 0%,
-    #d84315 20%,
-    #e64a19 50%,
-    #f57c00 70%,
-    #e64a19 85%,
-    #d84315 100%
-  );
-  border-top: 2px solid rgba(255, 255, 255, 0.2);
-  border-bottom: 2px solid rgba(0, 0, 0, 0.2);
-  box-shadow:
-    0 4px 16px rgba(216, 67, 21, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
-
-  @media (max-width: 768px) {
-    padding: 14px 16px;
-  }
-
-  @media (max-width: 480px) {
-    padding: 12px 14px;
-  }
-`;
-
-const ComingSoonText = styled.span`
-  font-size: 2rem;
-  font-weight: 700;
-  color: white;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-
-  @media (max-width: 768px) {
-    font-size: 1.75rem;
-  }
-
-  @media (max-width: 480px) {
-    font-size: 1.5rem;
-  }
-`;
-
 const CardInner = styled.div`
   position: relative;
   z-index: 2;
@@ -299,17 +215,19 @@ type HomeCardProps = {
   subtitle?: string;
   theme: ThemeColor;
   icon: LucideIcon;
-  comingSoon?: boolean;
 };
 
-function CardBody({
+export function HomeCard({
+  to,
   title,
   subtitle,
+  theme,
   icon: Icon,
-  comingSoon,
-}: Pick<HomeCardProps, 'title' | 'subtitle' | 'icon' | 'comingSoon'>) {
+}: HomeCardProps) {
+  const Card = theme === 'blue' ? BlueCard : OrangeCard;
+
   return (
-    <>
+    <Card to={to}>
       <CardInner>
         <CardRow>
           <CardContent>
@@ -321,43 +239,6 @@ function CardBody({
           </IconWrap>
         </CardRow>
       </CardInner>
-      {comingSoon && (
-        <ComingSoonOverlay>
-          <ComingSoonTape>
-            <ComingSoonText>Çok Yakında</ComingSoonText>
-          </ComingSoonTape>
-        </ComingSoonOverlay>
-      )}
-    </>
-  );
-}
-
-export function HomeCard({
-  to,
-  title,
-  subtitle,
-  theme,
-  icon,
-  comingSoon,
-}: HomeCardProps) {
-  if (comingSoon && theme === 'orange') {
-    return (
-      <OrangeCardDisabled aria-disabled="true">
-        <CardBody
-          title={title}
-          subtitle={subtitle}
-          icon={icon}
-          comingSoon={comingSoon}
-        />
-      </OrangeCardDisabled>
-    );
-  }
-
-  const Card = theme === 'blue' ? BlueCard : OrangeCard;
-
-  return (
-    <Card to={to}>
-      <CardBody title={title} subtitle={subtitle} icon={icon} />
     </Card>
   );
 }
