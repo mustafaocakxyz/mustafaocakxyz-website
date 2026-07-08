@@ -3,6 +3,7 @@ import { GlobalStyle } from './styles/GlobalStyle';
 import { GelisimProgramiPage } from './pages/GelisimProgramiPage';
 import { GelisimProgramiBasvuruIntroPage } from './pages/GelisimProgramiBasvuruIntroPage';
 import { GelisimProgramiBasvuruPage } from './pages/GelisimProgramiBasvuruPage';
+import { GelisimProgramiBilgilendirmePage } from './pages/GelisimProgramiBilgilendirmePage';
 import { GelisimProgramiPaymentPage } from './pages/GelisimProgramiPaymentPage';
 import { GelisimProgramiHavalePage } from './pages/GelisimProgramiHavalePage';
 import { HomePage } from './pages/HomePage';
@@ -23,6 +24,10 @@ export default function App() {
         <Route path="/gelisim-programi" element={<GelisimProgramiPage />} />
         <Route path="/gelisim-programi/basvuru-bilgi" element={<GelisimProgramiBasvuruIntroPage />} />
         <Route path="/gelisim-programi/basvuru" element={<GelisimProgramiBasvuruPage />} />
+        <Route
+          path="/gelisim-programi/bilgilendirme"
+          element={<GelisimProgramiBilgilendirmePage />}
+        />
         <Route path="/gelisim-programi/odeme" element={<GelisimProgramiPaymentPage />} />
         <Route path="/gelisim-programi/odeme/havale" element={<GelisimProgramiHavalePage />} />
         <Route path="/basvuru" element={<OnboardingFormPage />} />

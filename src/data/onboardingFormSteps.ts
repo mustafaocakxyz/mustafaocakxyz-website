@@ -26,6 +26,7 @@ export type ChoiceField = {
   type: 'choice';
   label: string;
   options: { value: string; label: string }[];
+  layout?: 'stack' | 'row-2' | 'row-3';
 };
 
 export type FormField = TextField | TextareaField | SelectField | ChoiceField;

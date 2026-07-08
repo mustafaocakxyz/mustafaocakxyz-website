@@ -202,19 +202,20 @@ const FieldTextarea = styled.textarea<{
   }
 `;
 
-const ChoiceStack = styled.div<{ $horizontal?: boolean }>`
+const ChoiceStack = styled.div<{ $columns: 1 | 2 | 3 }>`
   display: grid;
-  grid-template-columns: ${({ $horizontal }) => ($horizontal ? 'repeat(3, 1fr)' : '1fr')};
+  grid-template-columns: ${({ $columns }) => `repeat(${$columns}, 1fr)`};
   gap: 10px;
 `;
 
 const ChoiceOption = styled.button<{
   $selected: boolean;
   $accent: ReturnType<typeof getFormAccent>;
-  $horizontal?: boolean;
+  $columns: 1 | 2 | 3;
 }>`
   width: 100%;
-  padding: ${({ $horizontal }) => ($horizontal ? '14px 10px' : '16px 18px')};
+  min-height: ${({ $columns }) => ($columns === 1 ? 'unset' : '96px')};
+  padding: ${({ $columns }) => ($columns === 1 ? '16px 18px' : '14px 10px')};
   border-radius: 14px;
   border: 1px solid
     ${({ $selected, $accent }) =>
@@ -222,10 +223,10 @@ const ChoiceOption = styled.button<{
   background: ${({ $selected, $accent }) =>
     $selected ? $accent.choiceBgSelected : 'rgba(255, 255, 255, 0.06)'};
   color: rgba(255, 255, 255, 0.95);
-  font-size: ${({ $horizontal }) => ($horizontal ? '0.875rem' : '0.95rem')};
+  font-size: ${({ $columns }) => ($columns === 1 ? '0.95rem' : '0.875rem')};
   font-family: inherit;
   line-height: 1.4;
-  text-align: ${({ $horizontal }) => ($horizontal ? 'center' : 'left')};
+  text-align: ${({ $columns }) => ($columns === 1 ? 'left' : 'center')};
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease;
 
@@ -390,17 +391,23 @@ export function OnboardingForm({
     }
 
     if (field.type === 'choice') {
-      const horizontal = field.options.length === 3;
+      const columns =
+        field.layout === 'row-2'
+          ? 2
+          : field.layout === 'row-3' || field.options.length === 3
+            ? 3
+            : 1;
+
       return (
         <ChoiceStack
           role="radiogroup"
           aria-labelledby={`${field.id}-label`}
-          $horizontal={horizontal}
+          $columns={columns}
         >
           {field.options.map((option) => (
             <ChoiceOption
               $accent={accent}
-              $horizontal={horizontal}
+              $columns={columns}
               key={option.value}
               type="button"
               role="radio"

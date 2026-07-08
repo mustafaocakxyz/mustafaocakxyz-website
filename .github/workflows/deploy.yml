@@ -36,6 +36,7 @@ jobs:
           VITE_GOOGLE_SCRIPT_URL: ${{ secrets.VITE_GOOGLE_SCRIPT_URL }}
           VITE_SUBMIT_SECRET: ${{ secrets.VITE_SUBMIT_SECRET }}
           VITE_GELISIM_SUBMIT_SECRET: ${{ secrets.VITE_GELISIM_SUBMIT_SECRET }}
+          VITE_GELISIM_BILGILENDIRME_SUBMIT_SECRET: ${{ secrets.VITE_GELISIM_BILGILENDIRME_SUBMIT_SECRET }}
 
       - name: Add SPA fallback for client-side routes
         run: cp dist/index.html dist/404.html
