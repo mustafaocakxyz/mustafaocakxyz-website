@@ -11,12 +11,16 @@ import { TekSeferlikPage } from './pages/TekSeferlikPage';
 import { TekSeferlikPaymentPage } from './pages/TekSeferlikPaymentPage';
 import { TekSeferlikHavalePage } from './pages/TekSeferlikHavalePage';
 import { OnboardingFormPage } from './pages/OnboardingFormPage';
+import { RegisterPrivatePage } from './pages/RegisterPrivatePage';
+import { AppRoutes } from './app/AppRoutes';
 
 export default function App() {
   return (
     <BrowserRouter>
       <GlobalStyle />
       <Routes>
+        <Route path="/app/*" element={<AppRoutes />} />
+        <Route path="/register-private" element={<RegisterPrivatePage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/tek-seferlik" element={<TekSeferlikPage />} />
         <Route path="/tek-seferlik/odeme" element={<TekSeferlikPaymentPage />} />
