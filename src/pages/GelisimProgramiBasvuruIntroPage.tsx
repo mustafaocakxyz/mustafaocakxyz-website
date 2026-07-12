@@ -1,6 +1,6 @@
 import { GradientTitle } from '../components/GradientTitle';
 import {
-  PaymentActionRouterLink,
+  // PaymentActionRouterLink, // restore with Formu Doldur CTA below
   PaymentContent,
   PaymentOptionCard,
   PaymentOptionLabel,
@@ -34,6 +34,29 @@ const Description = styled.p`
   }
 `;
 
+const DisabledActionButton = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 22px;
+  border-radius: 30px;
+  background: linear-gradient(135deg, #5a5a5a 0%, #6e6e6e 50%, #7a7a7a 100%);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  border: none;
+  cursor: not-allowed;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  user-select: none;
+  pointer-events: none;
+
+  @media (max-width: 600px) {
+    width: 100%;
+  }
+`;
+
 export function GelisimProgramiBasvuruIntroPage() {
   return (
     <DetailLayout>
@@ -41,16 +64,24 @@ export function GelisimProgramiBasvuruIntroPage() {
       <PaymentContent>
         <ProductSubtitle $theme="orange">Ücret: 5900₺ / ay</ProductSubtitle>
 
+        {/* Previous copy — restore when applications reopen:
         <Description>
           Başvurusu kabul edilen öğrenciler ödeme için yönlendirileceklerdir.
           Henüz herhangi bir ödeme yapmayacaksınız.
         </Description>
+        */}
+        <Description>
+          Şu anda bütün kontenjanlarımız dolu. İlgilendiğin için teşekkürler.
+        </Description>
 
         <PaymentOptionCard $theme="orange" $delay="0.6s">
           <PaymentOptionLabel>Başvurunu Yap</PaymentOptionLabel>
+          {/* Previous CTA — restore when applications reopen:
           <PaymentActionRouterLink $theme="orange" to="/gelisim-programi/basvuru">
             Formu Doldur
           </PaymentActionRouterLink>
+          */}
+          <DisabledActionButton>Kontenjan Dolu</DisabledActionButton>
         </PaymentOptionCard>
       </PaymentContent>
     </DetailLayout>
