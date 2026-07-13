@@ -78,18 +78,27 @@ export const TwoColumnGrid = styled.div`
   }
 `;
 
+export const AdminShell = styled(AppShell)`
+  padding: 12px 10px 20px;
+  align-items: stretch;
+
+  @media (max-width: 768px) {
+    padding: 10px 8px 16px;
+  }
+`;
+
 export const AdminContent = styled.div`
   width: 100%;
-  max-width: 1280px;
+  max-width: none;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 14px;
 `;
 
 export const AdminDashboardGrid = styled.div`
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 12px;
   align-items: start;
 
   @media (max-width: 900px) {
@@ -97,12 +106,33 @@ export const AdminDashboardGrid = styled.div`
   }
 `;
 
+export const AdminDetailGrid = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+export const AdminCard = styled(AppCard)`
+  padding: 14px;
+  gap: 12px;
+  border-radius: 14px;
+
+  @media (max-width: 768px) {
+    padding: 12px;
+  }
+`;
+
 export const StudentSidebar = styled.aside`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 16px;
-  border-radius: 20px;
+  padding: 10px;
+  border-radius: 14px;
   border: 1px solid rgba(66, 165, 245, 0.25);
   background: rgba(255, 255, 255, 0.06);
 `;
@@ -118,6 +148,10 @@ export const SidebarTitle = styled.h2`
 
 export const StudentListButton = styled.button<{ $selected: boolean }>`
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid
@@ -154,6 +188,6 @@ export const StudentDetailTitle = styled.h2`
 export const AdminMainPanel = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
   min-width: 0;
 `;

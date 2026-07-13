@@ -112,6 +112,32 @@ export async function fetchTasksForRange(
   return grouped;
 }
 
+/** Admin: load tasks for all students on the given dates (e.g. today + tomorrow). */
+export async function fetchOrgTasksForDates(
+  dates: string[],
+): Promise<Record<string, Record<string, StudentTask[]>>> {
+  if (dates.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('daily_tasks')
+    .select('id, student_id, task_date, label, completed, sort_order')
+    .in('task_date', dates)
+    .order('sort_order')
+    .order('created_at');
+
+  if (error) throw error;
+
+  const grouped: Record<string, Record<string, StudentTask[]>> = {};
+  for (const row of data ?? []) {
+    const task = row as DbDailyTask;
+    grouped[task.student_id] ??= {};
+    grouped[task.student_id][task.task_date] ??= [];
+    grouped[task.student_id][task.task_date].push(mapTask(task));
+  }
+
+  return grouped;
+}
+
 export async function fetchSubmissionsForRange(
   studentId: string,
   fromDate: string,

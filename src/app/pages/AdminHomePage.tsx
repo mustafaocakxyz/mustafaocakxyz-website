@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 import {
   createTask,
   deleteTask,
   exportOrganizationJson,
   exportStudentJson,
+  fetchOrgTasksForDates,
   fetchStudents,
   fetchSubmissionsForRange,
   fetchTasksForRange,
@@ -15,27 +16,35 @@ import {
 import { useAppAuth } from '../AppAuthContext';
 import { AdminEditableTaskList } from '../components/AdminEditableTaskList';
 import {
+  AdminCard,
   AdminContent,
   AdminDashboardGrid,
+  AdminDetailGrid,
   AdminMainPanel,
-  AppCard,
+  AdminShell,
   AppCardTitle,
-  AppShell,
   AppSubtitle,
   BlueTitle,
   SidebarTitle,
   StudentDetailTitle,
   StudentListButton,
   StudentSidebar,
-  TwoColumnGrid,
 } from '../components/AppShell';
 import { DaySlider, TextButton } from '../components/AppUi';
 import { SubmissionForm } from '../components/SubmissionForm';
 import type { DailySubmission, StudentSummary, StudentTask } from '../types';
 import { downloadJson } from '../utils/download';
-import { buildWeekDays, formatDayHeading, toDateKey } from '../utils/dates';
+import { buildWeekDays, formatDayHeading, startOfDay, toDateKey } from '../utils/dates';
 
 const TODAY_INDEX = 1;
+
+type CompletionTone = 'green' | 'yellow' | 'red' | 'muted';
+
+type StudentStatus = {
+  tomorrowReady: boolean;
+  todayPercent: number | null;
+  todayTone: CompletionTone;
+};
 
 const LoadingText = styled.p`
   margin: 0;
@@ -75,19 +84,173 @@ const ExportButton = styled.button`
   }
 `;
 
+const StudentName = styled.span`
+  width: 100%;
+  line-height: 1.3;
+`;
+
+const StatusPills = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+`;
+
+const StatusPill = styled.span<{ $tone?: CompletionTone; $ready?: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+
+  ${({ $ready }) =>
+    $ready === true &&
+    css`
+      border: 1px solid rgba(102, 187, 106, 0.45);
+      background: rgba(76, 175, 80, 0.18);
+      color: rgba(200, 230, 201, 0.95);
+    `}
+
+  ${({ $ready }) =>
+    $ready === false &&
+    css`
+      border: 1px solid rgba(239, 83, 80, 0.4);
+      background: rgba(244, 67, 54, 0.16);
+      color: rgba(255, 205, 210, 0.95);
+    `}
+
+  ${({ $tone }) =>
+    $tone === 'green' &&
+    css`
+      border: 1px solid rgba(102, 187, 106, 0.5);
+      background: rgba(76, 175, 80, 0.22);
+      color: rgba(200, 230, 201, 0.98);
+    `}
+
+  ${({ $tone }) =>
+    $tone === 'yellow' &&
+    css`
+      border: 1px solid rgba(255, 213, 79, 0.5);
+      background: rgba(255, 193, 7, 0.2);
+      color: rgba(255, 249, 196, 0.98);
+    `}
+
+  ${({ $tone }) =>
+    $tone === 'red' &&
+    css`
+      border: 1px solid rgba(239, 83, 80, 0.5);
+      background: rgba(244, 67, 54, 0.2);
+      color: rgba(255, 205, 210, 0.98);
+    `}
+
+  ${({ $tone }) =>
+    $tone === 'muted' &&
+    css`
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.5);
+    `}
+`;
+
+function getTodayAndTomorrowKeys(anchor = new Date()) {
+  const today = startOfDay(anchor);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  return {
+    todayKey: toDateKey(today),
+    tomorrowKey: toDateKey(tomorrow),
+  };
+}
+
+function completionTone(percent: number): CompletionTone {
+  if (percent >= 100) return 'green';
+  if (percent >= 50) return 'yellow';
+  return 'red';
+}
+
+function buildStudentStatus(
+  todayTasks: StudentTask[],
+  tomorrowTasks: StudentTask[],
+): StudentStatus {
+  const tomorrowReady = tomorrowTasks.length > 0;
+
+  if (todayTasks.length === 0) {
+    return {
+      tomorrowReady,
+      todayPercent: null,
+      todayTone: 'muted',
+    };
+  }
+
+  const completedCount = todayTasks.filter((task) => task.completed).length;
+  const todayPercent = Math.round((completedCount / todayTasks.length) * 100);
+
+  return {
+    tomorrowReady,
+    todayPercent,
+    todayTone: completionTone(todayPercent),
+  };
+}
+
+function buildStatusMap(
+  studentIds: string[],
+  tasksByStudent: Record<string, Record<string, StudentTask[]>>,
+  todayKey: string,
+  tomorrowKey: string,
+): Record<string, StudentStatus> {
+  const next: Record<string, StudentStatus> = {};
+  for (const studentId of studentIds) {
+    const byDate = tasksByStudent[studentId] ?? {};
+    next[studentId] = buildStudentStatus(byDate[todayKey] ?? [], byDate[tomorrowKey] ?? []);
+  }
+  return next;
+}
+
 export function AdminHomePage() {
   const { user, isLoading, logout } = useAppAuth();
   const weekDays = useMemo(() => buildWeekDays(), []);
   const weekFrom = toDateKey(weekDays[0]);
   const weekTo = toDateKey(weekDays[weekDays.length - 1]);
+  const { todayKey, tomorrowKey } = useMemo(() => getTodayAndTomorrowKeys(), []);
   const [students, setStudents] = useState<StudentSummary[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [selectedDayIndex, setSelectedDayIndex] = useState(TODAY_INDEX);
   const [tasksByDate, setTasksByDate] = useState<Record<string, StudentTask[]>>({});
   const [submissionsByDate, setSubmissionsByDate] = useState<Record<string, DailySubmission>>({});
+  const [studentStatuses, setStudentStatuses] = useState<Record<string, StudentStatus>>({});
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [error, setError] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+
+  const refreshStudentStatuses = useCallback(
+    async (studentIds: string[]) => {
+      if (studentIds.length === 0) {
+        setStudentStatuses({});
+        return;
+      }
+
+      const tasksByStudent = await fetchOrgTasksForDates([todayKey, tomorrowKey]);
+      setStudentStatuses(buildStatusMap(studentIds, tasksByStudent, todayKey, tomorrowKey));
+    },
+    [todayKey, tomorrowKey],
+  );
+
+  const syncSelectedStudentStatus = useCallback(
+    (studentId: string, nextTasksByDate: Record<string, StudentTask[]>) => {
+      setStudentStatuses((current) => ({
+        ...current,
+        [studentId]: buildStudentStatus(
+          nextTasksByDate[todayKey] ?? [],
+          nextTasksByDate[tomorrowKey] ?? [],
+        ),
+      }));
+    },
+    [todayKey, tomorrowKey],
+  );
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
@@ -102,6 +265,7 @@ export function AdminHomePage() {
         if (!isMounted) return;
         setStudents(rows);
         setSelectedStudentId((current) => current || rows[0]?.id || '');
+        await refreshStudentStatuses(rows.map((row) => row.id));
       } catch {
         if (isMounted) setError('Öğrenci listesi yüklenemedi.');
       } finally {
@@ -113,7 +277,7 @@ export function AdminHomePage() {
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [user, refreshStudentStatuses]);
 
   useEffect(() => {
     if (!selectedStudentId) return;
@@ -132,6 +296,7 @@ export function AdminHomePage() {
         if (!isMounted) return;
         setTasksByDate(tasks);
         setSubmissionsByDate(submissions);
+        syncSelectedStudentStatus(selectedStudentId, tasks);
       } catch {
         if (isMounted) setError('Öğrenci verileri yüklenemedi.');
       } finally {
@@ -143,13 +308,13 @@ export function AdminHomePage() {
     return () => {
       isMounted = false;
     };
-  }, [selectedStudentId, weekFrom, weekTo]);
+  }, [selectedStudentId, weekFrom, weekTo, syncSelectedStudentStatus]);
 
   if (isLoading) {
     return (
-      <AppShell>
+      <AdminShell>
         <LoadingText>Yükleniyor...</LoadingText>
-      </AppShell>
+      </AdminShell>
     );
   }
 
@@ -177,36 +342,52 @@ export function AdminHomePage() {
         label,
         tasks.length,
       );
-      setTasksByDate((current) => ({
-        ...current,
-        [selectedDateKey]: [...(current[selectedDateKey] ?? []), created],
-      }));
+      setTasksByDate((current) => {
+        const next = {
+          ...current,
+          [selectedDateKey]: [...(current[selectedDateKey] ?? []), created],
+        };
+        syncSelectedStudentStatus(selectedStudent.id, next);
+        return next;
+      });
     } catch {
       setError('Görev eklenemedi.');
     }
   };
 
   const handleEditTask = async (taskId: string, label: string) => {
+    if (!selectedStudent) return;
+
     try {
       await updateTaskLabel(taskId, label);
-      setTasksByDate((current) => ({
-        ...current,
-        [selectedDateKey]: (current[selectedDateKey] ?? []).map((task) =>
-          task.id === taskId ? { ...task, label } : task,
-        ),
-      }));
+      setTasksByDate((current) => {
+        const next = {
+          ...current,
+          [selectedDateKey]: (current[selectedDateKey] ?? []).map((task) =>
+            task.id === taskId ? { ...task, label } : task,
+          ),
+        };
+        syncSelectedStudentStatus(selectedStudent.id, next);
+        return next;
+      });
     } catch {
       setError('Görev güncellenemedi.');
     }
   };
 
   const handleDeleteTask = async (taskId: string) => {
+    if (!selectedStudent) return;
+
     try {
       await deleteTask(taskId);
-      setTasksByDate((current) => ({
-        ...current,
-        [selectedDateKey]: (current[selectedDateKey] ?? []).filter((task) => task.id !== taskId),
-      }));
+      setTasksByDate((current) => {
+        const next = {
+          ...current,
+          [selectedDateKey]: (current[selectedDateKey] ?? []).filter((task) => task.id !== taskId),
+        };
+        syncSelectedStudentStatus(selectedStudent.id, next);
+        return next;
+      });
     } catch {
       setError('Görev silinemedi.');
     }
@@ -241,7 +422,7 @@ export function AdminHomePage() {
   };
 
   return (
-    <AppShell>
+    <AdminShell>
       <AdminContent>
         <div>
           <BlueTitle>Admin paneli</BlueTitle>
@@ -272,16 +453,32 @@ export function AdminHomePage() {
         <AdminDashboardGrid>
           <StudentSidebar>
             <SidebarTitle>Öğrenciler</SidebarTitle>
-            {students.map((student) => (
-              <StudentListButton
-                key={student.id}
-                type="button"
-                $selected={student.id === selectedStudentId}
-                onClick={() => setSelectedStudentId(student.id)}
-              >
-                {student.name}
-              </StudentListButton>
-            ))}
+            {students.map((student) => {
+              const status = studentStatuses[student.id];
+              const tomorrowReady = status?.tomorrowReady ?? false;
+              const todayTone = status?.todayTone ?? 'muted';
+              const todayLabel =
+                status?.todayPercent === null || status?.todayPercent === undefined
+                  ? '—'
+                  : `${status.todayPercent}%`;
+
+              return (
+                <StudentListButton
+                  key={student.id}
+                  type="button"
+                  $selected={student.id === selectedStudentId}
+                  onClick={() => setSelectedStudentId(student.id)}
+                >
+                  <StudentName>{student.name}</StudentName>
+                  <StatusPills>
+                    <StatusPill $ready={tomorrowReady}>
+                      Yarın {tomorrowReady ? '✅' : '❌'}
+                    </StatusPill>
+                    <StatusPill $tone={todayTone}>{todayLabel}</StatusPill>
+                  </StatusPills>
+                </StudentListButton>
+              );
+            })}
             {students.length === 0 && !isPageLoading ? (
               <AppSubtitle>Henüz öğrenci yok.</AppSubtitle>
             ) : null}
@@ -305,8 +502,8 @@ export function AdminHomePage() {
 
                 {isPageLoading ? <LoadingText>Yükleniyor...</LoadingText> : null}
 
-                <TwoColumnGrid>
-                  <AppCard>
+                <AdminDetailGrid>
+                  <AdminCard>
                     <AppCardTitle>Günlük görevler</AppCardTitle>
                     <AdminEditableTaskList
                       tasks={tasks}
@@ -314,17 +511,17 @@ export function AdminHomePage() {
                       onEdit={handleEditTask}
                       onDelete={handleDeleteTask}
                     />
-                  </AppCard>
+                  </AdminCard>
 
-                  <AppCard>
+                  <AdminCard>
                     <AppCardTitle>Günlük form</AppCardTitle>
                     <SubmissionForm
                       value={submission}
                       onChange={() => undefined}
                       readOnly
                     />
-                  </AppCard>
-                </TwoColumnGrid>
+                  </AdminCard>
+                </AdminDetailGrid>
               </>
             ) : (
               <AppSubtitle>Öğrenci seçin.</AppSubtitle>
@@ -341,6 +538,6 @@ export function AdminHomePage() {
           Çıkış yap
         </TextButton>
       </AdminContent>
-    </AppShell>
+    </AdminShell>
   );
 }
