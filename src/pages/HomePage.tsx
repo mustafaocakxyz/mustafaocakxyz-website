@@ -1,4 +1,3 @@
-import { MessageCircle, TrendingUp } from 'lucide-react';
 import { GradientTitle } from '../components/GradientTitle';
 import { HomeCard } from '../components/HomeCard';
 import { CardStack, HomeLayout } from '../components/PageLayout';
@@ -9,18 +8,20 @@ export function HomePage() {
       <GradientTitle>Hangisi için buradasın?</GradientTitle>
       <CardStack>
         <HomeCard
-          to="/tek-seferlik"
-          title="Tek Seferlik Görüşme"
-          subtitle="Mustafa Ocak ile birebir görüşmek, program desteği almak ve sorularını sormak isteyenler için. Aylık olarak tekrarlanmaz."
-          theme="blue"
-          icon={MessageCircle}
+          to="/gelisim-programi"
+          title="YKS & Maarif Koçluk"
+          price="5900₺ / ay"
+          description="Sürecini Mustafa Ocak ile birlikte götürmek isteyenler için. Aylık olarak tekrarlanır."
+          theme="orange"
+          delay="0.6s"
         />
         <HomeCard
-          to="/gelisim-programi"
-          title="Gelişim Programı"
-          subtitle="YKS sürecini Mustafa Ocak ile birlikte götürmek isteyenler için. Hedefinize ulaşana kadar devam eder."
-          theme="orange"
-          icon={TrendingUp}
+          to="/tek-seferlik"
+          title="Tek Seferlik Görüşme"
+          price="2900₺ / tek seferlik"
+          description="Mustafa Ocak ile birebir görüşmek, program desteği almak ve sorularını sormak isteyenler için. Aylık olarak tekrarlanmaz."
+          theme="blue"
+          delay="0.85s"
         />
       </CardStack>
     </HomeLayout>

@@ -29,7 +29,7 @@ export function ProgramSection({ section }: ProgramSectionProps) {
       )}
       {section.ctaAfter && (
         <SectionCtaWrap>
-          <CTAButton theme="orange" to={section.ctaAfter.to}>
+          <CTAButton theme="orange" to={section.ctaAfter.to} immediate>
             {section.ctaAfter.label}
           </CTAButton>
         </SectionCtaWrap>

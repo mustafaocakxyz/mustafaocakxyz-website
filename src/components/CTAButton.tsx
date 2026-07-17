@@ -7,7 +7,7 @@ import {
   type ThemeColor,
 } from '../styles/theme';
 
-const baseButton = css`
+const baseButton = css<{ $immediate?: boolean }>`
   padding: 18px 32px;
   border: none;
   border-radius: 30px;
@@ -18,8 +18,15 @@ const baseButton = css`
   transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
   margin-top: 40px;
   font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  animation: fadeInUp 0.8s ease-out both;
-  animation-delay: 1.6s;
+  ${({ $immediate }) =>
+    $immediate
+      ? css`
+          animation: none;
+        `
+      : css`
+          animation: fadeInUp 0.8s ease-out both;
+          animation-delay: 1.6s;
+        `}
 
   &:active {
     transform: translateY(-1px) scale(1.02);
@@ -49,7 +56,7 @@ const baseButton = css`
   }
 `;
 
-const BlueButton = styled.button`
+const BlueButton = styled.button<{ $immediate?: boolean }>`
   ${baseButton}
   background: ${blueButtonGradient};
   box-shadow: 0 8px 25px rgba(21, 101, 192, 0.3);
@@ -61,7 +68,7 @@ const BlueButton = styled.button`
   }
 `;
 
-const OrangeButton = styled.button`
+const OrangeButton = styled.button<{ $immediate?: boolean }>`
   ${baseButton}
   background: ${orangeButtonGradient};
   box-shadow: 0 8px 25px rgba(216, 67, 21, 0.3);
@@ -79,7 +86,7 @@ const linkStyles = css`
   text-decoration: none;
 `;
 
-const BlueButtonLink = styled(Link)`
+const BlueButtonLink = styled(Link)<{ $immediate?: boolean }>`
   ${baseButton}
   ${linkStyles}
   background: ${blueButtonGradient};
@@ -92,7 +99,7 @@ const BlueButtonLink = styled(Link)`
   }
 `;
 
-const OrangeButtonLink = styled(Link)`
+const OrangeButtonLink = styled(Link)<{ $immediate?: boolean }>`
   ${baseButton}
   ${linkStyles}
   background: ${orangeButtonGradient};
@@ -110,14 +117,23 @@ type CTAButtonProps = {
   children: ReactNode;
   onClick?: () => void;
   to?: string;
+  immediate?: boolean;
 };
 
-export function CTAButton({ theme, children, onClick, to }: CTAButtonProps) {
+export function CTAButton({ theme, children, onClick, to, immediate = false }: CTAButtonProps) {
   if (to) {
     const LinkButton = theme === 'blue' ? BlueButtonLink : OrangeButtonLink;
-    return <LinkButton to={to}>{children}</LinkButton>;
+    return (
+      <LinkButton to={to} $immediate={immediate}>
+        {children}
+      </LinkButton>
+    );
   }
 
   const Button = theme === 'blue' ? BlueButton : OrangeButton;
-  return <Button onClick={onClick}>{children}</Button>;
+  return (
+    <Button onClick={onClick} $immediate={immediate}>
+      {children}
+    </Button>
+  );
 }
