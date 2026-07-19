@@ -5,7 +5,7 @@ import { CardStack, HomeLayout } from '../components/PageLayout';
 export function HomePage() {
   return (
     <HomeLayout>
-      <GradientTitle>Hangisi için buradasın?</GradientTitle>
+      <GradientTitle>Hoş geldin</GradientTitle>
       <CardStack>
         <HomeCard
           to="/gelisim-programi"
@@ -15,6 +15,7 @@ export function HomePage() {
           theme="orange"
           delay="0.6s"
         />
+        {/* Hidden for now — restore when Tek Seferlik is offered again:
         <HomeCard
           to="/tek-seferlik"
           title="Tek Seferlik Görüşme"
@@ -23,6 +24,7 @@ export function HomePage() {
           theme="blue"
           delay="0.85s"
         />
+        */}
       </CardStack>
     </HomeLayout>
   );
