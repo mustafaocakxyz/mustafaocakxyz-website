@@ -19,12 +19,24 @@ function mapTask(row: DbDailyTask): StudentTask {
   };
 }
 
+function normalizeTimeValue(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value.slice(0, 5);
+}
+
+function normalizeHourValue(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function mapSubmission(row: DbDailySubmission): DailySubmission {
   return {
-    uykuUyanma: row.uyku_uyanma,
-    gunlukCalisma: row.gunluk_calisma,
-    ekranSuresi: row.ekran_suresi,
-    notlar: row.notlar,
+    uyumaSaati: normalizeTimeValue(row.uyuma_saati),
+    uyanmaSaati: normalizeTimeValue(row.uyanma_saati),
+    gunlukCalismaSaat: normalizeHourValue(row.gunluk_calisma_saat),
+    ekranSuresiSaat: normalizeHourValue(row.ekran_suresi_saat),
+    notlar: row.notlar ?? '',
   };
 }
 
@@ -32,9 +44,10 @@ function submissionToRow(studentId: string, dateKey: string, submission: DailySu
   return {
     student_id: studentId,
     submission_date: dateKey,
-    uyku_uyanma: submission.uykuUyanma,
-    gunluk_calisma: submission.gunlukCalisma,
-    ekran_suresi: submission.ekranSuresi,
+    uyuma_saati: submission.uyumaSaati,
+    uyanma_saati: submission.uyanmaSaati,
+    gunluk_calisma_saat: submission.gunlukCalismaSaat,
+    ekran_suresi_saat: submission.ekranSuresiSaat,
     notlar: submission.notlar,
   };
 }
@@ -146,7 +159,7 @@ export async function fetchSubmissionsForRange(
   const { data, error } = await supabase
     .from('daily_submissions')
     .select(
-      'id, student_id, submission_date, uyku_uyanma, gunluk_calisma, ekran_suresi, notlar',
+      'id, student_id, submission_date, uyuma_saati, uyanma_saati, gunluk_calisma_saat, ekran_suresi_saat, notlar',
     )
     .eq('student_id', studentId)
     .gte('submission_date', fromDate)
@@ -203,6 +216,38 @@ export async function updateTaskLabel(taskId: string, label: string) {
 
 export async function deleteTask(taskId: string) {
   const { error } = await supabase.from('daily_tasks').delete().eq('id', taskId);
+  if (error) throw error;
+}
+
+export async function fetchStudentShowcaseHighlights(): Promise<
+  Array<{ id: string; name: string; showcaseHighlight: string }>
+> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, showcase_highlight')
+    .eq('role', 'student')
+    .eq('is_active', true)
+    .order('display_name');
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    name: row.display_name as string,
+    showcaseHighlight: (row.showcase_highlight as string | null) ?? '',
+  }));
+}
+
+export async function updateStudentShowcaseHighlight(
+  studentId: string,
+  showcaseHighlight: string,
+) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ showcase_highlight: showcaseHighlight.trim() })
+    .eq('id', studentId)
+    .eq('role', 'student');
+
   if (error) throw error;
 }
 

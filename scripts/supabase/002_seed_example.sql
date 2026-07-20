@@ -100,6 +100,10 @@ insert into public.daily_submissions (
   uyku_uyanma,
   gunluk_calisma,
   ekran_suresi,
+  uyuma_saati,
+  uyanma_saati,
+  gunluk_calisma_saat,
+  ekran_suresi_saat,
   notlar
 )
 values (
@@ -109,6 +113,10 @@ values (
   '23:30 - 07:00',
   '5 saat',
   '1.5 saat',
+  '23:30'::time,
+  '07:00'::time,
+  5,
+  1.5,
   'Fizik tekrarında integral konusuna odaklandım.'
 )
 on conflict (student_id, submission_date) do update
@@ -116,4 +124,8 @@ set
   uyku_uyanma = excluded.uyku_uyanma,
   gunluk_calisma = excluded.gunluk_calisma,
   ekran_suresi = excluded.ekran_suresi,
+  uyuma_saati = excluded.uyuma_saati,
+  uyanma_saati = excluded.uyanma_saati,
+  gunluk_calisma_saat = excluded.gunluk_calisma_saat,
+  ekran_suresi_saat = excluded.ekran_suresi_saat,
   notlar = excluded.notlar;

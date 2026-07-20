@@ -1,24 +1,6 @@
 import { toDateKey } from '../utils/dates';
-
-export type StudentTask = {
-  id: string;
-  label: string;
-  completed: boolean;
-};
-
-export type DailySubmission = {
-  uykuUyanma: string;
-  gunlukCalisma: string;
-  ekranSuresi: string;
-  notlar: string;
-};
-
-const emptySubmission = (): DailySubmission => ({
-  uykuUyanma: '',
-  gunlukCalisma: '',
-  ekranSuresi: '',
-  notlar: '',
-});
+import type { DailySubmission, StudentTask } from '../types';
+import { emptyDailySubmission } from '../types';
 
 const DEFAULT_TASK_TEMPLATES = [
   'Matematik tekrar seti',
@@ -39,27 +21,24 @@ function createInitialTasks(
   }));
 }
 
-type MockStudentStoreOptions = {
-  studentId?: string;
+export function createMockStudentStore(options: {
+  studentId: string;
   taskTemplates?: string[];
-};
-
-export function createMockStudentStore(options: MockStudentStoreOptions = {}) {
-  const studentId = options.studentId ?? 'student';
+}) {
   const templates = options.taskTemplates ?? DEFAULT_TASK_TEMPLATES;
+  const today = new Date();
   const tasksByDate: Record<string, StudentTask[]> = {};
   const submissionsByDate: Record<string, DailySubmission> = {};
 
-  const today = new Date();
   for (let offset = -1; offset <= 5; offset += 1) {
-    const date = new Date(today);
-    date.setDate(today.getDate() + offset);
-    const dateKey = toDateKey(date);
-    tasksByDate[dateKey] = createInitialTasks(dateKey, studentId, templates);
-    submissionsByDate[dateKey] = emptySubmission();
+    const day = new Date(today);
+    day.setDate(today.getDate() + offset);
+    const dateKey = toDateKey(day);
+    tasksByDate[dateKey] = createInitialTasks(dateKey, options.studentId, templates);
   }
 
   return { tasksByDate, submissionsByDate };
 }
 
-export const emptyDailySubmission = emptySubmission;
+export { emptyDailySubmission };
+export type { DailySubmission, StudentTask };

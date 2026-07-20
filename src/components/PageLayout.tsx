@@ -10,10 +10,10 @@ export const HomeLayout = styled.div`
   justify-content: center;
   padding: 20px;
   font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  gap: 60px;
+  gap: 40px;
 
   @media (max-width: 768px) {
-    gap: 36px;
+    gap: 28px;
     padding: 16px;
   }
 `;

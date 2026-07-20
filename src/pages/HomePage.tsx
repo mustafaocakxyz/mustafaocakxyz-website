@@ -1,8 +1,31 @@
+import { useEffect, useState } from 'react';
 import { GradientTitle } from '../components/GradientTitle';
 import { HomeCard } from '../components/HomeCard';
+import { HomeStudentTeaser } from '../components/HomeStudentTeaser';
 import { CardStack, HomeLayout } from '../components/PageLayout';
+import { fetchPublicActiveStudentCount } from '../lib/fetchPublicStudentCount';
 
 export function HomePage() {
+  const [studentCount, setStudentCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCount = async () => {
+      try {
+        const count = await fetchPublicActiveStudentCount();
+        if (isMounted) setStudentCount(count);
+      } catch {
+        if (isMounted) setStudentCount(0);
+      }
+    };
+
+    void loadCount();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <HomeLayout>
       <GradientTitle>Hoş geldin</GradientTitle>
@@ -26,6 +49,7 @@ export function HomePage() {
         />
         */}
       </CardStack>
+      <HomeStudentTeaser count={studentCount} />
     </HomeLayout>
   );
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import styled, { css } from 'styled-components';
 import {
   createTask,
@@ -81,6 +81,25 @@ const ExportButton = styled.button`
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+`;
+
+const NavLinkButton = styled(Link)`
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(66, 165, 245, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(144, 202, 249, 0.95);
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-family: inherit;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+
+  &:hover {
+    border-color: rgba(66, 165, 245, 0.55);
+    background: rgba(255, 255, 255, 0.08);
   }
 `;
 
@@ -432,6 +451,7 @@ export function AdminHomePage() {
         </div>
 
         <ExportRow>
+          <NavLinkButton to="/app/admin/showcase">Kayda değer başarı düzenle</NavLinkButton>
           <ExportButton
             type="button"
             disabled={!selectedStudent || isExporting}

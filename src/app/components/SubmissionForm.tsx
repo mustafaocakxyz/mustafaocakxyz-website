@@ -1,6 +1,11 @@
 import styled from 'styled-components';
 import { getFormAccent } from '../../styles/formTheme';
-import type { DailySubmission } from '../types';
+import {
+  formatHourOptionLabel,
+  HOUR_OPTIONS,
+  TIME_OPTIONS,
+  type DailySubmission,
+} from '../types';
 
 const accent = getFormAccent('blue');
 
@@ -22,6 +27,16 @@ const FieldGroup = styled.div`
   gap: 8px;
 `;
 
+const SleepRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
 const FieldLabel = styled.label`
   font-size: 0.88rem;
   font-weight: 500;
@@ -39,6 +54,7 @@ const fieldStyles = `
   font-family: inherit;
   outline: none;
   transition: border-color 0.2s ease, background 0.2s ease;
+  color-scheme: dark;
 
   &:focus {
     border-color: ${accent.inputBorderFocus};
@@ -55,8 +71,24 @@ const fieldStyles = `
   }
 `;
 
-const SmallInput = styled.input`
+const FieldSelect = styled.select`
   ${fieldStyles}
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.55) 50%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.55) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-size:
+    6px 6px,
+    6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 36px;
+
+  option {
+    background: #0d2137;
+    color: rgba(255, 255, 255, 0.95);
+  }
 `;
 
 const MediumTextarea = styled.textarea`
@@ -66,47 +98,107 @@ const MediumTextarea = styled.textarea`
   line-height: 1.5;
 `;
 
-export function SubmissionForm({ value, onChange, readOnly = false }: SubmissionFormProps) {
-  const updateField = <K extends keyof DailySubmission>(field: K, next: string) => {
-    onChange({ ...value, [field]: next });
-  };
+function hourSelectValue(value: number | null): string {
+  return value === null ? '' : String(value);
+}
 
+function parseHourSelectValue(raw: string): number | null {
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function SubmissionForm({ value, onChange, readOnly = false }: SubmissionFormProps) {
   return (
     <FieldsStack>
-      <FieldGroup>
-        <FieldLabel htmlFor="uyku-uyanma">Uyku - Uyanma</FieldLabel>
-        <SmallInput
-          id="uyku-uyanma"
-          type="text"
-          placeholder="Örn. 23:30 - 07:00"
-          value={value.uykuUyanma}
-          disabled={readOnly}
-          onChange={(event) => updateField('uykuUyanma', event.target.value)}
-        />
-      </FieldGroup>
+      <SleepRow>
+        <FieldGroup>
+          <FieldLabel htmlFor="uyuma-saati">Uyuma</FieldLabel>
+          <FieldSelect
+            id="uyuma-saati"
+            value={value.uyumaSaati ?? ''}
+            disabled={readOnly}
+            onChange={(event) =>
+              onChange({
+                ...value,
+                uyumaSaati: event.target.value || null,
+              })
+            }
+          >
+            <option value="">Seçiniz</option>
+            {TIME_OPTIONS.map((time) => (
+              <option key={time} value={time}>
+                {time}
+              </option>
+            ))}
+          </FieldSelect>
+        </FieldGroup>
+
+        <FieldGroup>
+          <FieldLabel htmlFor="uyanma-saati">Uyanma</FieldLabel>
+          <FieldSelect
+            id="uyanma-saati"
+            value={value.uyanmaSaati ?? ''}
+            disabled={readOnly}
+            onChange={(event) =>
+              onChange({
+                ...value,
+                uyanmaSaati: event.target.value || null,
+              })
+            }
+          >
+            <option value="">Seçiniz</option>
+            {TIME_OPTIONS.map((time) => (
+              <option key={time} value={time}>
+                {time}
+              </option>
+            ))}
+          </FieldSelect>
+        </FieldGroup>
+      </SleepRow>
 
       <FieldGroup>
         <FieldLabel htmlFor="gunluk-calisma">Günlük Çalışma</FieldLabel>
-        <SmallInput
+        <FieldSelect
           id="gunluk-calisma"
-          type="text"
-          placeholder="Örn. 5 saat"
-          value={value.gunlukCalisma}
+          value={hourSelectValue(value.gunlukCalismaSaat)}
           disabled={readOnly}
-          onChange={(event) => updateField('gunlukCalisma', event.target.value)}
-        />
+          onChange={(event) =>
+            onChange({
+              ...value,
+              gunlukCalismaSaat: parseHourSelectValue(event.target.value),
+            })
+          }
+        >
+          <option value="">Seçiniz</option>
+          {HOUR_OPTIONS.map((hours) => (
+            <option key={hours} value={String(hours)}>
+              {formatHourOptionLabel(hours)}
+            </option>
+          ))}
+        </FieldSelect>
       </FieldGroup>
 
       <FieldGroup>
         <FieldLabel htmlFor="ekran-suresi">Ekran Süresi</FieldLabel>
-        <SmallInput
+        <FieldSelect
           id="ekran-suresi"
-          type="text"
-          placeholder="Örn. 1.5 saat"
-          value={value.ekranSuresi}
+          value={hourSelectValue(value.ekranSuresiSaat)}
           disabled={readOnly}
-          onChange={(event) => updateField('ekranSuresi', event.target.value)}
-        />
+          onChange={(event) =>
+            onChange({
+              ...value,
+              ekranSuresiSaat: parseHourSelectValue(event.target.value),
+            })
+          }
+        >
+          <option value="">Seçiniz</option>
+          {HOUR_OPTIONS.map((hours) => (
+            <option key={hours} value={String(hours)}>
+              {formatHourOptionLabel(hours)}
+            </option>
+          ))}
+        </FieldSelect>
       </FieldGroup>
 
       <FieldGroup>
@@ -116,7 +208,7 @@ export function SubmissionForm({ value, onChange, readOnly = false }: Submission
           placeholder="Günün notlarını yaz..."
           value={value.notlar}
           disabled={readOnly}
-          onChange={(event) => updateField('notlar', event.target.value)}
+          onChange={(event) => onChange({ ...value, notlar: event.target.value })}
         />
       </FieldGroup>
     </FieldsStack>

@@ -35,5 +35,9 @@ export type DbDailySubmission = {
   uyku_uyanma: string;
   gunluk_calisma: string;
   ekran_suresi: string;
+  uyuma_saati: string | null;
+  uyanma_saati: string | null;
+  gunluk_calisma_saat: number | null;
+  ekran_suresi_saat: number | null;
   notlar: string;
 };

@@ -4,7 +4,8 @@ import type { StudentTask } from '../types';
 
 type TaskListProps = {
   tasks: StudentTask[];
-  onToggle: (taskId: string) => void;
+  onToggle?: (taskId: string) => void;
+  readOnly?: boolean;
 };
 
 const TaskStack = styled.div`
@@ -13,7 +14,7 @@ const TaskStack = styled.div`
   gap: 10px;
 `;
 
-const TaskRow = styled.label<{ $completed: boolean }>`
+const TaskRow = styled.label<{ $completed: boolean; $readOnly?: boolean }>`
   display: flex;
   align-items: center;
   gap: 12px;
@@ -21,13 +22,17 @@ const TaskRow = styled.label<{ $completed: boolean }>`
   border-radius: 14px;
   border: 1px solid rgba(66, 165, 245, 0.2);
   background: rgba(255, 255, 255, 0.04);
-  cursor: pointer;
+  cursor: ${({ $readOnly }) => ($readOnly ? 'default' : 'pointer')};
   transition: border-color 0.2s ease, background 0.2s ease;
 
-  &:hover {
-    border-color: rgba(66, 165, 245, 0.4);
-    background: rgba(255, 255, 255, 0.06);
-  }
+  ${({ $readOnly }) =>
+    !$readOnly &&
+    `
+    &:hover {
+      border-color: rgba(66, 165, 245, 0.4);
+      background: rgba(255, 255, 255, 0.06);
+    }
+  `}
 `;
 
 const HiddenCheckbox = styled.input`
@@ -68,7 +73,7 @@ const EmptyState = styled.p`
   color: rgba(255, 255, 255, 0.45);
 `;
 
-export function TaskList({ tasks, onToggle }: TaskListProps) {
+export function TaskList({ tasks, onToggle, readOnly = false }: TaskListProps) {
   if (tasks.length === 0) {
     return <EmptyState>Bu gün için görev yok.</EmptyState>;
   }
@@ -76,11 +81,15 @@ export function TaskList({ tasks, onToggle }: TaskListProps) {
   return (
     <TaskStack>
       {tasks.map((task) => (
-        <TaskRow key={task.id} $completed={task.completed}>
+        <TaskRow key={task.id} $completed={task.completed} $readOnly={readOnly}>
           <HiddenCheckbox
             type="checkbox"
             checked={task.completed}
-            onChange={() => onToggle(task.id)}
+            readOnly={readOnly}
+            disabled={readOnly}
+            onChange={() => {
+              if (!readOnly && onToggle) onToggle(task.id);
+            }}
           />
           <CheckboxVisual $checked={task.completed}>
             {task.completed ? <Check size={14} strokeWidth={3} /> : null}

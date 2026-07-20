@@ -41,9 +41,10 @@ export function createMockStudents(): StudentRecord[] {
   return [
     withStudentStore('student-1', 'Ayşe Yılmaz', {
       todaySubmission: {
-        uykuUyanma: '23:30 - 07:00',
-        gunlukCalisma: '5 saat',
-        ekranSuresi: '1.5 saat',
+        uyumaSaati: '23:30',
+        uyanmaSaati: '07:00',
+        gunlukCalismaSaat: 5,
+        ekranSuresiSaat: 1.5,
         notlar: 'Fizik tekrarında integral konusuna odaklandım.',
       },
     }),
@@ -54,9 +55,10 @@ export function createMockStudents(): StudentRecord[] {
         'Geometri soru çözümü',
       ],
       todaySubmission: {
-        uykuUyanma: '00:15 - 06:45',
-        gunlukCalisma: '4 saat',
-        ekranSuresi: '2 saat',
+        uyumaSaati: '00:00',
+        uyanmaSaati: '06:30',
+        gunlukCalismaSaat: 4,
+        ekranSuresiSaat: 2,
         notlar: 'Deneme sonrası yanlış analizi yaptım.',
       },
     }),
@@ -66,9 +68,10 @@ export function createMockStudents(): StudentRecord[] {
     withStudentStore('student-4', 'Can Öztürk', {
       taskTemplates: ['İngilizce kelime', 'Tarih konu özeti', 'Fizik soru bankası'],
       todaySubmission: {
-        uykuUyanma: '23:00 - 07:30',
-        gunlukCalisma: '6 saat',
-        ekranSuresi: '45 dk',
+        uyumaSaati: '23:00',
+        uyanmaSaati: '07:30',
+        gunlukCalismaSaat: 6,
+        ekranSuresiSaat: 0.5,
         notlar: '',
       },
     }),

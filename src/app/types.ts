@@ -14,10 +14,12 @@ export type StudentTask = {
   completed: boolean;
 };
 
+/** Structured daily form. Null means not filled yet (not the same as 0). */
 export type DailySubmission = {
-  uykuUyanma: string;
-  gunlukCalisma: string;
-  ekranSuresi: string;
+  uyumaSaati: string | null;
+  uyanmaSaati: string | null;
+  gunlukCalismaSaat: number | null;
+  ekranSuresiSaat: number | null;
   notlar: string;
 };
 
@@ -27,8 +29,25 @@ export type StudentSummary = {
 };
 
 export const emptyDailySubmission = (): DailySubmission => ({
-  uykuUyanma: '',
-  gunlukCalisma: '',
-  ekranSuresi: '',
+  uyumaSaati: null,
+  uyanmaSaati: null,
+  gunlukCalismaSaat: null,
+  ekranSuresiSaat: null,
   notlar: '',
 });
+
+/** 0, 0.5, …, 12 */
+export const HOUR_OPTIONS: number[] = Array.from({ length: 25 }, (_, i) => i / 2);
+
+/** 00:00, 00:30, …, 23:30 */
+export const TIME_OPTIONS: string[] = Array.from({ length: 48 }, (_, i) => {
+  const totalMinutes = i * 30;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+});
+
+export function formatHourOptionLabel(hours: number): string {
+  const label = Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+  return `${label} saat`;
+}

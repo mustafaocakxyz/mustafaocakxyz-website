@@ -33,6 +33,7 @@ create table public.profiles (
   login_username text not null,
   auth_email text not null unique,
   is_active boolean not null default true,
+  showcase_highlight text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint profiles_login_username_org_unique unique (organization_id, login_username)
@@ -67,13 +68,26 @@ create table public.daily_submissions (
   organization_id uuid not null references public.organizations (id) on delete cascade,
   student_id uuid not null references public.profiles (id) on delete cascade,
   submission_date date not null,
+  -- Soft legacy text fields (kept for old rows; app writes structured columns below)
   uyku_uyanma text not null default '',
   gunluk_calisma text not null default '',
   ekran_suresi text not null default '',
+  uyuma_saati time,
+  uyanma_saati time,
+  gunluk_calisma_saat numeric(4, 1),
+  ekran_suresi_saat numeric(4, 1),
   notlar text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint daily_submissions_student_date_unique unique (student_id, submission_date)
+  constraint daily_submissions_student_date_unique unique (student_id, submission_date),
+  constraint daily_submissions_gunluk_calisma_saat_range check (
+    gunluk_calisma_saat is null
+    or (gunluk_calisma_saat >= 0 and gunluk_calisma_saat <= 12)
+  ),
+  constraint daily_submissions_ekran_suresi_saat_range check (
+    ekran_suresi_saat is null
+    or (ekran_suresi_saat >= 0 and ekran_suresi_saat <= 12)
+  )
 );
 
 create index daily_submissions_student_date_idx
@@ -418,9 +432,16 @@ begin
         ),
         'submission', (
           select jsonb_build_object(
-            'uykuUyanma', s.uyku_uyanma,
-            'gunlukCalisma', s.gunluk_calisma,
-            'ekranSuresi', s.ekran_suresi,
+            'uyumaSaati', case
+              when s.uyuma_saati is null then null
+              else to_char(s.uyuma_saati, 'HH24:MI')
+            end,
+            'uyanmaSaati', case
+              when s.uyanma_saati is null then null
+              else to_char(s.uyanma_saati, 'HH24:MI')
+            end,
+            'gunlukCalismaSaat', s.gunluk_calisma_saat,
+            'ekranSuresiSaat', s.ekran_suresi_saat,
             'notlar', s.notlar,
             'updatedAt', s.updated_at
           )
@@ -437,7 +458,7 @@ begin
   from date_spine ds;
 
   return jsonb_build_object(
-    'version', 1,
+    'version', 2,
     'exportedAt', now(),
     'scope', 'student',
     'organization', jsonb_build_object(
@@ -452,7 +473,9 @@ begin
     'student', jsonb_build_object(
       'id', v_student.id,
       'displayName', v_student.display_name,
-      'loginUsername', v_student.login_username
+      'loginUsername', v_student.login_username,
+      'role', v_student.role,
+      'showcaseHighlight', v_student.showcase_highlight
     ),
     'days', v_days
   );
