@@ -90,6 +90,7 @@ const PanelTitle = styled.h2`
   color: rgba(255, 204, 188, 0.8);
 `;
 
+/* Restored with the stats card:
 const Line = styled.p`
   margin: 0;
   font-size: 1.08rem;
@@ -100,6 +101,7 @@ const Line = styled.p`
     color: rgba(255, 255, 255, 0.98);
   }
 `;
+*/
 
 const PillRow = styled.div`
   display: flex;
