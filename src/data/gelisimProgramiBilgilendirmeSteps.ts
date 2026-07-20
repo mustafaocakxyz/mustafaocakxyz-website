@@ -30,7 +30,7 @@ export const GELISIM_PROGRAMI_BILGILENDIRME_STEPS: FormStep[] = [
         id: 'ilk-gorusme-musaitlik',
         type: 'choice',
         label:
-          '12 Temmuz Pazar günü ilk görüşmemizi yapacağız ve süreci başlatacağız. Müsait misin?',
+          'Bu hafta bitmeden ilk görüşmemizi yapacağız ve süreci başlatacağız. Müsait misin?',
         layout: 'row-2',
         options: [
           { value: 'musaitim', label: 'Müsaitim' },
