@@ -3,6 +3,7 @@ export type TextField = {
   type: 'text';
   label: string;
   placeholder?: string;
+  required?: boolean;
 };
 
 export type TextareaField = {

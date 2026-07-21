@@ -351,6 +351,19 @@ export function OnboardingForm({
 
   const updateField = (id: string, value: string) => {
     setFormValues((prev) => ({ ...prev, [id]: value }));
+    setSubmitError(null);
+  };
+
+  const getMissingRequiredLabels = (targetStep: FormStep): string[] => {
+    if (!isStandardStep(targetStep)) return [];
+    return targetStep.fields
+      .filter(
+        (field) =>
+          'required' in field &&
+          field.required &&
+          !(formValues[field.id] ?? '').trim(),
+      )
+      .map((field) => field.label);
   };
 
   const renderField = (field: FormField) => {
@@ -431,6 +444,8 @@ export function OnboardingForm({
         value={formValues[field.id] ?? ''}
         onChange={(e) => updateField(field.id, e.target.value)}
         placeholder={field.placeholder}
+        required={field.required}
+        aria-required={field.required || undefined}
       />
     );
   };
@@ -446,6 +461,7 @@ export function OnboardingForm({
                 htmlFor={field.type !== 'choice' ? field.id : undefined}
               >
                 {field.label}
+                {'required' in field && field.required ? ' *' : ''}
               </FieldLabel>
               {renderField(field)}
             </FieldGroup>
@@ -484,6 +500,12 @@ export function OnboardingForm({
   };
 
   const goNext = async () => {
+    const missing = getMissingRequiredLabels(step);
+    if (missing.length > 0) {
+      setSubmitError(`${missing.join(' ve ')} zorunludur.`);
+      return;
+    }
+
     if (isLastStep) {
       setSubmitError(null);
       setIsSubmitting(true);
@@ -500,6 +522,7 @@ export function OnboardingForm({
       return;
     }
 
+    setSubmitError(null);
     setCurrentStep((s) => s + 1);
   };
 

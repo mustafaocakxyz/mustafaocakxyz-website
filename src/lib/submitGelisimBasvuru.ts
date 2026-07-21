@@ -1,4 +1,11 @@
 export async function submitGelisimBasvuru(formValues: Record<string, string>) {
+  const isim = (formValues.isim ?? '').trim();
+  const telefon = (formValues.telefon ?? '').trim();
+
+  if (!isim || !telefon) {
+    throw new Error('İsim ve telefon numarası zorunludur.');
+  }
+
   const scriptUrl = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
   const secret = import.meta.env.VITE_GELISIM_SUBMIT_SECRET;
 

@@ -49,6 +49,20 @@ const START_TIME = {
   'daha-sonra': 'Daha Sonra',
 };
 
+const BILGILENDIRME_SHEET_NAME = 'Gelişim Bilgilendirme';
+const BILGILENDIRME_SUBMIT_SECRET = 'xyzxyz';
+
+const BILGILENDIRME_HEADERS = [
+  'Timestamp', 'İsim', 'Sınıf', 'Alan',
+  'TYT Türkçe', 'TYT Sosyal', 'TYT Matematik', 'TYT Geometri', 'TYT Fen',
+  'AYT Bilgileri',
+  'Ortalama Çalışma', 'Ortalama Ekran', 'Uyku Düzeni',
+  'TYT Kaynak Türkçe', 'TYT Kaynak Sosyal', 'TYT Kaynak Matematik', 'TYT Kaynak Geometri', 'TYT Kaynak Fen',
+  'AYT Kaynakları',
+  'İlk Görüşme Müsaitlik', 'Ekstra',
+  'raw_json',
+];
+
 function doGet() {
   return jsonResponse({ ok: true, message: 'Başvuru endpoint is alive' });
 }
@@ -66,6 +80,14 @@ function doPost(e) {
       if (data.secret !== GELISIM_SUBMIT_SECRET) {
         return jsonResponse({ ok: false, error: 'Unauthorized' });
       }
+      var isim = String(data.isim || '').trim();
+      var telefon = String(data.telefon || '').trim();
+      if (!isim || !telefon) {
+        return jsonResponse({
+          ok: false,
+          error: 'İsim ve telefon numarası zorunludur.',
+        });
+      }
       appendGelisimRow(data);
       try {
         notifyGelisimBasvuru(data);
@@ -73,6 +95,14 @@ function doPost(e) {
         // Sheet write already succeeded — don't fail the applicant submit
         Logger.log('notifyGelisimBasvuru failed: ' + mailErr);
       }
+      return jsonResponse({ ok: true });
+    }
+
+    if (formType === 'gelisim-bilgilendirme') {
+      if (data.secret !== BILGILENDIRME_SUBMIT_SECRET) {
+        return jsonResponse({ ok: false, error: 'Unauthorized' });
+      }
+      appendBilgilendirmeRow(data);
       return jsonResponse({ ok: true });
     }
 
@@ -222,6 +252,47 @@ function appendRow(row) {
     sheet.appendRow(HEADERS);
   }
 
+  sheet.appendRow(row);
+}
+
+function appendBilgilendirmeRow(data) {
+  var aytInfo = summarizePrefixedFields(data, 'ayt-', ['ayt-kaynak-']);
+  var aytKaynak = summarizePrefixedFields(data, 'ayt-kaynak-');
+
+  var musaitlikKey = data['ilk-gorusme-musaitlik'] || '';
+  var musaitlikLabel =
+    musaitlikKey === 'musaitim' ? 'Müsaitim' :
+    musaitlikKey === 'degilim' ? 'Değilim' :
+    musaitlikKey;
+
+  var row = [
+    new Date(),
+    data.isim || '',
+    data.sinif || '',
+    data.alan || '',
+    data['tyt-turkce'] || '',
+    data['tyt-sosyal'] || '',
+    data['tyt-matematik'] || '',
+    data['tyt-geometri'] || '',
+    data['tyt-fen'] || '',
+    aytInfo,
+    data['ortalama-calisma'] || '',
+    data['ortalama-ekran'] || '',
+    data['uyku-duzeni'] || '',
+    data['tyt-kaynak-Türkçe'] || '',
+    data['tyt-kaynak-Sosyal'] || '',
+    data['tyt-kaynak-Matematik'] || '',
+    data['tyt-kaynak-Geometri'] || '',
+    data['tyt-kaynak-Fen'] || '',
+    aytKaynak,
+    musaitlikLabel,
+    data.ekstra || '',
+    JSON.stringify(data),
+  ];
+
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BILGILENDIRME_SHEET_NAME);
+  if (!sheet) throw new Error('Sheet not found: ' + BILGILENDIRME_SHEET_NAME);
+  if (sheet.getLastRow() === 0) sheet.appendRow(BILGILENDIRME_HEADERS);
   sheet.appendRow(row);
 }
 

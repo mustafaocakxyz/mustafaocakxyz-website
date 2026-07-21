@@ -23,8 +23,8 @@ export const GELISIM_PROGRAMI_FORM_STEPS: FormStep[] = [
   {
     title: '#1 - Kişisel Bilgiler',
     fields: [
-      personalStep.fields[0],
-      { id: 'telefon', type: 'text', label: 'Telefon Numaranız' },
+      { ...personalStep.fields[0], required: true },
+      { id: 'telefon', type: 'text', label: 'Telefon Numaranız', required: true },
       ...personalStep.fields.slice(1),
     ],
   },
