@@ -103,6 +103,84 @@ const NavLinkButton = styled(Link)`
   }
 `;
 
+const HeaderRow = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+`;
+
+const HeaderCopy = styled.div`
+  min-width: 0;
+`;
+
+const EarningsBadge = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(102, 187, 106, 0.4);
+  background: rgba(76, 175, 80, 0.12);
+`;
+
+const LiveDotWrap = styled.span`
+  position: relative;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const LiveDotCore = styled.span`
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #66bb6a;
+  box-shadow: 0 0 10px rgba(102, 187, 106, 0.7);
+  z-index: 1;
+`;
+
+const LiveDotPulse = styled.span`
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(102, 187, 106, 0.45);
+  animation: adminEarningsBreath 1.8s ease-in-out infinite;
+
+  @keyframes adminEarningsBreath {
+    0%,
+    100% {
+      transform: scale(0.85);
+      opacity: 0.7;
+    }
+    50% {
+      transform: scale(2.1);
+      opacity: 0;
+    }
+  }
+`;
+
+const EarningsAmount = styled.span`
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: rgba(165, 214, 167, 0.98);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+`;
+
+const PRICE_PER_STUDENT = 5000;
+const FREE_TRIAL_OFFSET = 1;
+
+function formatMonthlyEarnings(activeStudentCount: number): string {
+  const paying = Math.max(0, activeStudentCount - FREE_TRIAL_OFFSET);
+  const amount = paying * PRICE_PER_STUDENT;
+  return `${amount.toLocaleString('tr-TR')} ₺`;
+}
+
 const StudentName = styled.span`
   width: 100%;
   line-height: 1.3;
@@ -443,12 +521,21 @@ export function AdminHomePage() {
   return (
     <AdminShell>
       <AdminContent>
-        <div>
-          <BlueTitle>Admin paneli</BlueTitle>
-          <AppSubtitle style={{ marginTop: 8 }}>
-            Öğrenci seçerek günlük görevleri yönetebilir ve formları görüntüleyebilirsin.
-          </AppSubtitle>
-        </div>
+        <HeaderRow>
+          <HeaderCopy>
+            <BlueTitle>Admin paneli</BlueTitle>
+            <AppSubtitle style={{ marginTop: 8 }}>
+              Öğrenci seçerek günlük görevleri yönetebilir ve formları görüntüleyebilirsin.
+            </AppSubtitle>
+          </HeaderCopy>
+          <EarningsBadge title="Aylık kazanç = (aktif öğrenci − 1) × 5000">
+            <LiveDotWrap aria-hidden>
+              <LiveDotPulse />
+              <LiveDotCore />
+            </LiveDotWrap>
+            <EarningsAmount>{formatMonthlyEarnings(students.length)}</EarningsAmount>
+          </EarningsBadge>
+        </HeaderRow>
 
         <ExportRow>
           <NavLinkButton to="/app/admin/showcase">Kayda değer başarı düzenle</NavLinkButton>
