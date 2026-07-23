@@ -19,11 +19,16 @@ if (!isStandardStep(personalStep)) {
   throw new Error('Expected first gelisim form step to be Kişisel Bilgiler');
 }
 
+const isimField = personalStep.fields[0];
+if (isimField.type !== 'text') {
+  throw new Error('Expected first personal field to be text (İsim)');
+}
+
 export const GELISIM_PROGRAMI_FORM_STEPS: FormStep[] = [
   {
     title: '#1 - Kişisel Bilgiler',
     fields: [
-      { ...personalStep.fields[0], required: true },
+      { ...isimField, required: true },
       { id: 'telefon', type: 'text', label: 'Telefon Numaranız', required: true },
       ...personalStep.fields.slice(1),
     ],
