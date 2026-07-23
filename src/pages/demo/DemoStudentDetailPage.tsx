@@ -150,7 +150,7 @@ export function DemoStudentDetailPage() {
         <Days>{student.daysInProgram} gündür programda</Days>
 
         <FeaturedPanel>
-          <PanelTitle>Kayda değer başarı</PanelTitle>
+          <PanelTitle>Kayda değer</PanelTitle>
           <PillRow>
             <SoftPill>{student.highlight}</SoftPill>
           </PillRow>

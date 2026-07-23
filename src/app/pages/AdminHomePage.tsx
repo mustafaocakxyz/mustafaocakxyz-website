@@ -555,7 +555,7 @@ export function AdminHomePage() {
         </HeaderRow>
 
         <ExportRow>
-          <NavLinkButton to="/app/admin/showcase">Kayda değer başarı düzenle</NavLinkButton>
+          <NavLinkButton to="/app/admin/showcase">Kayda değer düzenle</NavLinkButton>
           <ExportButton
             type="button"
             disabled={!selectedStudent || isExporting}

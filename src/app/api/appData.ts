@@ -256,13 +256,14 @@ export async function deleteTask(taskId: string) {
 }
 
 export async function fetchStudentShowcaseHighlights(): Promise<
-  Array<{ id: string; name: string; showcaseHighlight: string }>
+  Array<{ id: string; name: string; showcaseHighlight: string; showcaseSortOrder: number }>
 > {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, display_name, showcase_highlight')
+    .select('id, display_name, showcase_highlight, showcase_sort_order')
     .eq('role', 'student')
     .eq('is_active', true)
+    .order('showcase_sort_order')
     .order('display_name');
 
   if (error) throw error;
@@ -271,6 +272,7 @@ export async function fetchStudentShowcaseHighlights(): Promise<
     id: row.id as string,
     name: row.display_name as string,
     showcaseHighlight: (row.showcase_highlight as string | null) ?? '',
+    showcaseSortOrder: Number(row.showcase_sort_order ?? 0),
   }));
 }
 
@@ -285,6 +287,24 @@ export async function updateStudentShowcaseHighlight(
     .eq('role', 'student');
 
   if (error) throw error;
+}
+
+/** Persist full showcase list order (index = sort order). */
+export async function updateShowcaseSortOrders(
+  orderedStudentIds: string[],
+): Promise<void> {
+  const results = await Promise.all(
+    orderedStudentIds.map((studentId, index) =>
+      supabase
+        .from('profiles')
+        .update({ showcase_sort_order: index })
+        .eq('id', studentId)
+        .eq('role', 'student'),
+    ),
+  );
+
+  const firstError = results.find((result) => result.error)?.error;
+  if (firstError) throw firstError;
 }
 
 export async function exportStudentJson(

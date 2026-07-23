@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
   fetchStudentShowcaseHighlights,
+  updateShowcaseSortOrders,
   updateStudentShowcaseHighlight,
 } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
@@ -49,7 +51,7 @@ const SuccessText = styled.p`
 
 const EditorGrid = styled.div`
   display: grid;
-  grid-template-columns: minmax(200px, 280px) 1fr;
+  grid-template-columns: minmax(240px, 300px) 1fr;
   gap: 20px;
 
   @media (max-width: 800px) {
@@ -63,25 +65,60 @@ const StudentList = styled.div`
   gap: 8px;
 `;
 
-const StudentButton = styled.button<{ $selected: boolean }>`
-  width: 100%;
-  text-align: left;
-  padding: 12px 14px;
+const StudentRow = styled.div<{ $selected: boolean }>`
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
   border-radius: 14px;
   border: 1px solid
     ${({ $selected }) =>
       $selected ? 'rgba(66, 165, 245, 0.65)' : 'rgba(66, 165, 245, 0.22)'};
   background: ${({ $selected }) =>
     $selected ? 'rgba(33, 150, 243, 0.2)' : 'rgba(255, 255, 255, 0.04)'};
+`;
+
+const StudentButton = styled.button`
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.92rem;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
+`;
 
-  &:hover {
-    border-color: rgba(66, 165, 245, 0.5);
-    background: rgba(255, 255, 255, 0.07);
+const OrderControls = styled.div`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 6px 4px 0;
+`;
+
+const OrderButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 22px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(144, 202, 249, 0.95);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  &:disabled {
+    opacity: 0.28;
+    cursor: not-allowed;
   }
 `;
 
@@ -150,6 +187,7 @@ type StudentHighlight = {
   id: string;
   name: string;
   showcaseHighlight: string;
+  showcaseSortOrder: number;
 };
 
 export function AdminShowcasePage() {
@@ -159,6 +197,7 @@ export function AdminShowcasePage() {
   const [draft, setDraft] = useState('');
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
   const [error, setError] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
 
@@ -238,14 +277,41 @@ export function AdminShowcasePage() {
     }
   };
 
+  const moveStudent = async (index: number, direction: -1 | 1) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= students.length || isReordering) return;
+
+    const previous = students;
+    const next = [...students];
+    const [moved] = next.splice(index, 1);
+    next.splice(targetIndex, 0, moved);
+    const withOrder = next.map((entry, sortOrder) => ({
+      ...entry,
+      showcaseSortOrder: sortOrder,
+    }));
+
+    setStudents(withOrder);
+    setIsReordering(true);
+    setError('');
+    try {
+      await updateShowcaseSortOrders(withOrder.map((entry) => entry.id));
+    } catch {
+      setStudents(previous);
+      setError('Sıra kaydedilemedi.');
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
   return (
     <AdminShell>
       <AdminContent>
         <div>
           <BackLink to="/app/admin">← Admin paneline dön</BackLink>
-          <BlueTitle>Kayda değer başarı</BlueTitle>
+          <BlueTitle>Kayda değer</BlueTitle>
           <AppSubtitle style={{ marginTop: 8 }}>
-            Öğrenci seçip serbest metin gir. Boş bırakırsan öne çıkan kart gizlenir.
+            Öğrenci seçip serbest metin gir. Soldaki oklarla /ogrenciler sırasını
+            değiştir. Boş bırakırsan öne çıkan kart gizlenir.
           </AppSubtitle>
         </div>
 
@@ -256,15 +322,30 @@ export function AdminShowcasePage() {
           <AdminCard>
             <AppCardTitle>Öğrenciler</AppCardTitle>
             <StudentList>
-              {students.map((student) => (
-                <StudentButton
-                  key={student.id}
-                  type="button"
-                  $selected={student.id === selectedId}
-                  onClick={() => setSelectedId(student.id)}
-                >
-                  {student.name}
-                </StudentButton>
+              {students.map((student, index) => (
+                <StudentRow key={student.id} $selected={student.id === selectedId}>
+                  <StudentButton type="button" onClick={() => setSelectedId(student.id)}>
+                    {student.name}
+                  </StudentButton>
+                  <OrderControls>
+                    <OrderButton
+                      type="button"
+                      aria-label="Yukarı taşı"
+                      disabled={index === 0 || isReordering}
+                      onClick={() => void moveStudent(index, -1)}
+                    >
+                      <ChevronUp size={14} />
+                    </OrderButton>
+                    <OrderButton
+                      type="button"
+                      aria-label="Aşağı taşı"
+                      disabled={index === students.length - 1 || isReordering}
+                      onClick={() => void moveStudent(index, 1)}
+                    >
+                      <ChevronDown size={14} />
+                    </OrderButton>
+                  </OrderControls>
+                </StudentRow>
               ))}
               {students.length === 0 && !isPageLoading ? (
                 <AppSubtitle>Henüz öğrenci yok.</AppSubtitle>

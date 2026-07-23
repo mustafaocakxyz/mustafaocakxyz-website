@@ -192,7 +192,7 @@ export function OgrenciDetailPage() {
 
         {student.highlight ? (
           <FeaturedPanel>
-            <PanelTitle>Kayda değer başarı</PanelTitle>
+            <PanelTitle>Kayda değer</PanelTitle>
             <PillRow>
               <SoftPill>{student.highlight}</SoftPill>
             </PillRow>
