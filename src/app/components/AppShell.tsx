@@ -117,6 +117,13 @@ export const AdminDetailGrid = styled.div`
   }
 `;
 
+export const DetailColumnStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+`;
+
 export const AdminCard = styled(AppCard)`
   padding: 14px;
   gap: 12px;

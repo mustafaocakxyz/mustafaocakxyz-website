@@ -1,5 +1,6 @@
 import {
   supabase,
+  type DbDailyAdminNote,
   type DbDailySubmission,
   type DbDailyTask,
   type DbProfile,
@@ -177,6 +178,41 @@ export async function fetchSubmissionsForRange(
 
 export async function setTaskCompleted(taskId: string, completed: boolean) {
   const { error } = await supabase.from('daily_tasks').update({ completed }).eq('id', taskId);
+  if (error) throw error;
+}
+
+export async function fetchAdminNotesForRange(
+  studentId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<Record<string, string>> {
+  const { data, error } = await supabase
+    .from('daily_admin_notes')
+    .select('id, student_id, note_date, body')
+    .eq('student_id', studentId)
+    .gte('note_date', fromDate)
+    .lte('note_date', toDate);
+
+  if (error) throw error;
+
+  const grouped: Record<string, string> = {};
+  for (const row of data ?? []) {
+    const note = row as DbDailyAdminNote;
+    grouped[note.note_date] = note.body ?? '';
+  }
+
+  return grouped;
+}
+
+export async function upsertAdminNote(studentId: string, dateKey: string, body: string) {
+  const { error } = await supabase.from('daily_admin_notes').upsert(
+    {
+      student_id: studentId,
+      note_date: dateKey,
+      body,
+    },
+    { onConflict: 'student_id,note_date' },
+  );
   if (error) throw error;
 }
 

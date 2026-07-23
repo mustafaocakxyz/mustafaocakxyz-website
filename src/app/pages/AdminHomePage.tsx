@@ -6,12 +6,14 @@ import {
   deleteTask,
   exportOrganizationJson,
   exportStudentJson,
+  fetchAdminNotesForRange,
   fetchOrgTasksForDates,
   fetchStudents,
   fetchSubmissionsForRange,
   fetchTasksForRange,
   getSubmissionForDate,
   updateTaskLabel,
+  upsertAdminNote,
 } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
 import { AdminEditableTaskList } from '../components/AdminEditableTaskList';
@@ -25,12 +27,14 @@ import {
   AppCardTitle,
   AppSubtitle,
   BlueTitle,
+  DetailColumnStack,
   SidebarTitle,
   StudentDetailTitle,
   StudentListButton,
   StudentSidebar,
 } from '../components/AppShell';
 import { DaySlider, TextButton } from '../components/AppUi';
+import { DayAdminNote } from '../components/DayAdminNote';
 import { SubmissionForm } from '../components/SubmissionForm';
 import type { DailySubmission, StudentSummary, StudentTask } from '../types';
 import { downloadJson } from '../utils/download';
@@ -318,6 +322,7 @@ export function AdminHomePage() {
   const [selectedDayIndex, setSelectedDayIndex] = useState(TODAY_INDEX);
   const [tasksByDate, setTasksByDate] = useState<Record<string, StudentTask[]>>({});
   const [submissionsByDate, setSubmissionsByDate] = useState<Record<string, DailySubmission>>({});
+  const [adminNotesByDate, setAdminNotesByDate] = useState<Record<string, string>>({});
   const [studentStatuses, setStudentStatuses] = useState<Record<string, StudentStatus>>({});
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [error, setError] = useState('');
@@ -385,14 +390,16 @@ export function AdminHomePage() {
 
     const loadStudentWeek = async () => {
       try {
-        const [tasks, submissions] = await Promise.all([
+        const [tasks, submissions, adminNotes] = await Promise.all([
           fetchTasksForRange(selectedStudentId, weekFrom, weekTo),
           fetchSubmissionsForRange(selectedStudentId, weekFrom, weekTo),
+          fetchAdminNotesForRange(selectedStudentId, weekFrom, weekTo),
         ]);
 
         if (!isMounted) return;
         setTasksByDate(tasks);
         setSubmissionsByDate(submissions);
+        setAdminNotesByDate(adminNotes);
         syncSelectedStudentStatus(selectedStudentId, tasks);
       } catch {
         if (isMounted) setError('Öğrenci verileri yüklenemedi.');
@@ -428,6 +435,7 @@ export function AdminHomePage() {
   const selectedDateKey = toDateKey(selectedDate);
   const tasks = tasksByDate[selectedDateKey] ?? [];
   const submission = getSubmissionForDate(submissionsByDate, selectedDateKey);
+  const adminNote = adminNotesByDate[selectedDateKey] ?? '';
 
   const handleAddTask = async (label: string) => {
     if (!selectedStudent) return;
@@ -488,6 +496,15 @@ export function AdminHomePage() {
     } catch {
       setError('Görev silinemedi.');
     }
+  };
+
+  const handleSaveAdminNote = async (body: string) => {
+    if (!selectedStudent) return;
+    await upsertAdminNote(selectedStudent.id, selectedDateKey, body);
+    setAdminNotesByDate((current) => ({
+      ...current,
+      [selectedDateKey]: body,
+    }));
   };
 
   const handleExportStudent = async () => {
@@ -610,15 +627,25 @@ export function AdminHomePage() {
                 {isPageLoading ? <LoadingText>Yükleniyor...</LoadingText> : null}
 
                 <AdminDetailGrid>
-                  <AdminCard>
-                    <AppCardTitle>Günlük görevler</AppCardTitle>
-                    <AdminEditableTaskList
-                      tasks={tasks}
-                      onAdd={handleAddTask}
-                      onEdit={handleEditTask}
-                      onDelete={handleDeleteTask}
-                    />
-                  </AdminCard>
+                  <DetailColumnStack>
+                    <AdminCard>
+                      <AppCardTitle>Günlük görevler</AppCardTitle>
+                      <AdminEditableTaskList
+                        tasks={tasks}
+                        onAdd={handleAddTask}
+                        onEdit={handleEditTask}
+                        onDelete={handleDeleteTask}
+                      />
+                    </AdminCard>
+
+                    <AdminCard>
+                      <AppCardTitle>Bugüne Notlar</AppCardTitle>
+                      <DayAdminNote
+                        value={adminNote}
+                        onSave={handleSaveAdminNote}
+                      />
+                    </AdminCard>
+                  </DetailColumnStack>
 
                   <AdminCard>
                     <AppCardTitle>Günlük form</AppCardTitle>

@@ -41,3 +41,10 @@ export type DbDailySubmission = {
   ekran_suresi_saat: number | null;
   notlar: string;
 };
+
+export type DbDailyAdminNote = {
+  id: string;
+  student_id: string;
+  note_date: string;
+  body: string;
+};

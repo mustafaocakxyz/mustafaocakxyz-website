@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
+  fetchAdminNotesForRange,
   fetchSubmissionsForRange,
   fetchTasksForRange,
   getSubmissionForDate,
@@ -16,9 +17,11 @@ import {
   AppShell,
   AppSubtitle,
   BlueTitle,
+  DetailColumnStack,
   TwoColumnGrid,
 } from '../components/AppShell';
 import { DaySlider, TextButton } from '../components/AppUi';
+import { DayAdminNote } from '../components/DayAdminNote';
 import { SubmissionForm } from '../components/SubmissionForm';
 import { TaskList } from '../components/TaskList';
 import type { DailySubmission, StudentTask } from '../types';
@@ -44,6 +47,7 @@ export function StudentDashboardPage() {
   const [selectedIndex, setSelectedIndex] = useState(TODAY_INDEX);
   const [tasksByDate, setTasksByDate] = useState<Record<string, StudentTask[]>>({});
   const [submissionsByDate, setSubmissionsByDate] = useState<Record<string, DailySubmission>>({});
+  const [adminNotesByDate, setAdminNotesByDate] = useState<Record<string, string>>({});
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [error, setError] = useState('');
   const skipSubmissionSave = useRef(true);
@@ -57,14 +61,16 @@ export function StudentDashboardPage() {
 
     const loadWeek = async () => {
       try {
-        const [tasks, submissions] = await Promise.all([
+        const [tasks, submissions, adminNotes] = await Promise.all([
           fetchTasksForRange(user.id, weekFrom, weekTo),
           fetchSubmissionsForRange(user.id, weekFrom, weekTo),
+          fetchAdminNotesForRange(user.id, weekFrom, weekTo),
         ]);
 
         if (!isMounted) return;
         setTasksByDate(tasks);
         setSubmissionsByDate(submissions);
+        setAdminNotesByDate(adminNotes);
         skipSubmissionSave.current = true;
       } catch {
         if (isMounted) setError('Veriler yüklenemedi.');
@@ -83,6 +89,7 @@ export function StudentDashboardPage() {
   const selectedDateKey = toDateKey(selectedDate);
   const tasks = tasksByDate[selectedDateKey] ?? [];
   const submission = getSubmissionForDate(submissionsByDate, selectedDateKey);
+  const adminNote = adminNotesByDate[selectedDateKey] ?? '';
 
   useEffect(() => {
     if (!user || user.role !== 'student' || isPageLoading) return;
@@ -163,10 +170,17 @@ export function StudentDashboardPage() {
         {isPageLoading ? <LoadingText>Yükleniyor...</LoadingText> : null}
 
         <TwoColumnGrid>
-          <AppCard>
-            <AppCardTitle>Günlük görevler</AppCardTitle>
-            <TaskList tasks={tasks} onToggle={handleToggleTask} />
-          </AppCard>
+          <DetailColumnStack>
+            <AppCard>
+              <AppCardTitle>Günlük görevler</AppCardTitle>
+              <TaskList tasks={tasks} onToggle={handleToggleTask} />
+            </AppCard>
+
+            <AppCard>
+              <AppCardTitle>Bugüne Notlar</AppCardTitle>
+              <DayAdminNote value={adminNote} readOnly />
+            </AppCard>
+          </DetailColumnStack>
 
           <AppCard>
             <AppCardTitle>Günlük form</AppCardTitle>
