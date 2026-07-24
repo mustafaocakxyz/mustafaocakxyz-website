@@ -55,10 +55,24 @@ function sendStudentStatusDigest() {
 }
 
 function buildDigestEmail(digest) {
-  var students = digest.students || [];
+  var students = (digest.students || []).slice();
   var generatedAt = digest.generatedAt || '';
   var today = digest.today || '';
   var tomorrow = digest.tomorrow || '';
+
+  students.sort(function (a, b) {
+    var aPercent = a.today && a.today.percent;
+    var bPercent = b.today && b.today.percent;
+    var aValue =
+      aPercent === null || aPercent === undefined ? -1 : Number(aPercent);
+    var bValue =
+      bPercent === null || bPercent === undefined ? -1 : Number(bPercent);
+    if (aValue !== bValue) return aValue - bValue;
+
+    var aName = String(a.displayName || a.loginUsername || '');
+    var bName = String(b.displayName || b.loginUsername || '');
+    return aName.localeCompare(bName, 'tr');
+  });
 
   var lines = [
     'Öğrenci durumu özeti',
@@ -73,19 +87,28 @@ function buildDigestEmail(digest) {
     for (var i = 0; i < students.length; i++) {
       var s = students[i];
       var todayInfo = s.today || {};
+      var percent = todayInfo.percent;
+      var circle = digestCompletionCircle(percent);
       var percentLabel =
-        todayInfo.percent === null || todayInfo.percent === undefined
+        percent === null || percent === undefined
           ? '— (görev yok)'
-          : '%' + todayInfo.percent +
-            ' (' + (todayInfo.completed || 0) + '/' + (todayInfo.total || 0) + ')';
-      var tomorrowLabel = s.tomorrowReady ? '✅ hazır' : '❌ yok';
+          : '%' +
+            percent +
+            ' (' +
+            (todayInfo.completed || 0) +
+            '/' +
+            (todayInfo.total || 0) +
+            ')';
+      var tomorrowEmoji = s.tomorrowReady ? '✅' : '❌';
 
       lines.push(
         (s.displayName || s.loginUsername || 'Öğrenci') +
-          '  |  Bugün: ' +
+          '  |  ' +
+          circle +
+          ' Bugün: ' +
           percentLabel +
-          '  |  Yarın: ' +
-          tomorrowLabel,
+          '  |  Yarın ' +
+          tomorrowEmoji,
       );
     }
   }
@@ -107,6 +130,15 @@ function buildDigestEmail(digest) {
     subject: 'Öğrenci durumu' + hourLabel + ' (' + today + ')',
     body: lines.join('\n'),
   };
+}
+
+/** Matches admin dashboard: 100% green, >=50% yellow, <50% red. */
+function digestCompletionCircle(percent) {
+  if (percent === null || percent === undefined) return '⚪';
+  var value = Number(percent);
+  if (value >= 100) return '🟢';
+  if (value >= 50) return '🟡';
+  return '🔴';
 }
 
 /**

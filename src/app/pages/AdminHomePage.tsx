@@ -436,6 +436,16 @@ export function AdminHomePage() {
   const tasks = tasksByDate[selectedDateKey] ?? [];
   const submission = getSubmissionForDate(submissionsByDate, selectedDateKey);
   const adminNote = adminNotesByDate[selectedDateKey] ?? '';
+  const sortedStudents = [...students].sort((a, b) => {
+    const aPercent = studentStatuses[a.id]?.todayPercent;
+    const bPercent = studentStatuses[b.id]?.todayPercent;
+    const aValue =
+      aPercent === null || aPercent === undefined ? -1 : aPercent;
+    const bValue =
+      bPercent === null || bPercent === undefined ? -1 : bPercent;
+    if (aValue !== bValue) return aValue - bValue;
+    return a.name.localeCompare(b.name, 'tr');
+  });
 
   const handleAddTask = async (label: string) => {
     if (!selectedStudent) return;
@@ -577,7 +587,7 @@ export function AdminHomePage() {
         <AdminDashboardGrid>
           <StudentSidebar>
             <SidebarTitle>Öğrenciler</SidebarTitle>
-            {students.map((student) => {
+            {sortedStudents.map((student) => {
               const status = studentStatuses[student.id];
               const tomorrowReady = status?.tomorrowReady ?? false;
               const todayTone = status?.todayTone ?? 'muted';
@@ -603,7 +613,7 @@ export function AdminHomePage() {
                 </StudentListButton>
               );
             })}
-            {students.length === 0 && !isPageLoading ? (
+            {sortedStudents.length === 0 && !isPageLoading ? (
               <AppSubtitle>Henüz öğrenci yok.</AppSubtitle>
             ) : null}
           </StudentSidebar>
