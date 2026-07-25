@@ -48,3 +48,11 @@ export type DbDailyAdminNote = {
   note_date: string;
   body: string;
 };
+
+export type DbStudentMeeting = {
+  id: string;
+  student_id: string;
+  meeting_date: string;
+  meeting_time: string;
+  meeting_link: string;
+};

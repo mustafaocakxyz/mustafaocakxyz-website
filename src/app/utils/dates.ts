@@ -36,3 +36,27 @@ export function formatDayHeading(date: Date): string {
     month: 'long',
   }).format(date);
 }
+
+/** Today through the next (count - 1) days. */
+export function buildUpcomingDays(count = 10, anchor = new Date()): Date[] {
+  const today = startOfDay(anchor);
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + index);
+    return date;
+  });
+}
+
+export function addDaysToDateKey(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+}
+
+export function normalizeMeetingLink(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}

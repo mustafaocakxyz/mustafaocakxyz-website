@@ -28,6 +28,14 @@ export type StudentSummary = {
   name: string;
 };
 
+export type StudentMeeting = {
+  id: string;
+  studentId: string;
+  meetingDate: string;
+  meetingTime: string;
+  meetingLink: string;
+};
+
 export const emptyDailySubmission = (): DailySubmission => ({
   uyumaSaati: null,
   uyanmaSaati: null,
@@ -46,6 +54,16 @@ export const TIME_OPTIONS: string[] = Array.from({ length: 48 }, (_, i) => {
   const minutes = totalMinutes % 60;
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 });
+
+/** 00:00 … 23:00 */
+export const HOUR_TIME_OPTIONS: string[] = Array.from({ length: 24 }, (_, i) =>
+  String(i).padStart(2, '0'),
+);
+
+/** 00 … 59 */
+export const MINUTE_TIME_OPTIONS: string[] = Array.from({ length: 60 }, (_, i) =>
+  String(i).padStart(2, '0'),
+);
 
 export function formatHourOptionLabel(hours: number): string {
   const label = Number.isInteger(hours) ? String(hours) : hours.toFixed(1);

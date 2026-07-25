@@ -5,6 +5,7 @@ import {
   fetchAdminNotesForRange,
   fetchSubmissionsForRange,
   fetchTasksForRange,
+  fetchUpcomingMeeting,
   getSubmissionForDate,
   setTaskCompleted,
   upsertSubmission,
@@ -22,9 +23,10 @@ import {
 } from '../components/AppShell';
 import { DaySlider, TextButton } from '../components/AppUi';
 import { DayAdminNote } from '../components/DayAdminNote';
+import { MeetingPanel } from '../components/MeetingPanel';
 import { SubmissionForm } from '../components/SubmissionForm';
 import { TaskList } from '../components/TaskList';
-import type { DailySubmission, StudentTask } from '../types';
+import type { DailySubmission, StudentMeeting, StudentTask } from '../types';
 import { buildWeekDays, formatDayHeading, toDateKey } from '../utils/dates';
 
 const TODAY_INDEX = 1;
@@ -44,10 +46,12 @@ export function StudentDashboardPage() {
   const weekDays = useMemo(() => buildWeekDays(), []);
   const weekFrom = toDateKey(weekDays[0]);
   const weekTo = toDateKey(weekDays[weekDays.length - 1]);
+  const todayKey = toDateKey(weekDays[TODAY_INDEX]);
   const [selectedIndex, setSelectedIndex] = useState(TODAY_INDEX);
   const [tasksByDate, setTasksByDate] = useState<Record<string, StudentTask[]>>({});
   const [submissionsByDate, setSubmissionsByDate] = useState<Record<string, DailySubmission>>({});
   const [adminNotesByDate, setAdminNotesByDate] = useState<Record<string, string>>({});
+  const [upcomingMeeting, setUpcomingMeeting] = useState<StudentMeeting | null>(null);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [error, setError] = useState('');
   const skipSubmissionSave = useRef(true);
@@ -61,16 +65,18 @@ export function StudentDashboardPage() {
 
     const loadWeek = async () => {
       try {
-        const [tasks, submissions, adminNotes] = await Promise.all([
+        const [tasks, submissions, adminNotes, meeting] = await Promise.all([
           fetchTasksForRange(user.id, weekFrom, weekTo),
           fetchSubmissionsForRange(user.id, weekFrom, weekTo),
           fetchAdminNotesForRange(user.id, weekFrom, weekTo),
+          fetchUpcomingMeeting(user.id, todayKey),
         ]);
 
         if (!isMounted) return;
         setTasksByDate(tasks);
         setSubmissionsByDate(submissions);
         setAdminNotesByDate(adminNotes);
+        setUpcomingMeeting(meeting);
         skipSubmissionSave.current = true;
       } catch {
         if (isMounted) setError('Veriler yüklenemedi.');
@@ -83,7 +89,7 @@ export function StudentDashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, [user, weekFrom, weekTo]);
+  }, [user, weekFrom, weekTo, todayKey]);
 
   const selectedDate = weekDays[selectedIndex];
   const selectedDateKey = toDateKey(selectedDate);
@@ -182,10 +188,19 @@ export function StudentDashboardPage() {
             </AppCard>
           </DetailColumnStack>
 
-          <AppCard>
-            <AppCardTitle>Günlük form</AppCardTitle>
-            <SubmissionForm value={submission} onChange={handleSubmissionChange} />
-          </AppCard>
+          <DetailColumnStack>
+            <AppCard>
+              <AppCardTitle>Günlük form</AppCardTitle>
+              <SubmissionForm value={submission} onChange={handleSubmissionChange} />
+            </AppCard>
+
+            {upcomingMeeting ? (
+              <AppCard>
+                <AppCardTitle>Görüşme</AppCardTitle>
+                <MeetingPanel meeting={upcomingMeeting} readOnly />
+              </AppCard>
+            ) : null}
+          </DetailColumnStack>
         </TwoColumnGrid>
 
         <TextButton

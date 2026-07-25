@@ -4,13 +4,16 @@ import {
   type DbDailySubmission,
   type DbDailyTask,
   type DbProfile,
+  type DbStudentMeeting,
 } from '../../lib/supabase';
 import {
   emptyDailySubmission,
   type DailySubmission,
+  type StudentMeeting,
   type StudentSummary,
   type StudentTask,
 } from '../types';
+import { normalizeMeetingLink, toDateKey } from '../utils/dates';
 
 function mapTask(row: DbDailyTask): StudentTask {
   return {
@@ -213,6 +216,80 @@ export async function upsertAdminNote(studentId: string, dateKey: string, body: 
     },
     { onConflict: 'student_id,note_date' },
   );
+  if (error) throw error;
+}
+
+function mapMeeting(row: DbStudentMeeting): StudentMeeting {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    meetingDate: row.meeting_date,
+    meetingTime: (row.meeting_time ?? '').slice(0, 5),
+    meetingLink: row.meeting_link ?? '',
+  };
+}
+
+/** Next meeting on/after fromDate (defaults to today local). */
+export async function fetchUpcomingMeeting(
+  studentId: string,
+  fromDate = toDateKey(new Date()),
+): Promise<StudentMeeting | null> {
+  const { data, error } = await supabase
+    .from('student_meetings')
+    .select('id, student_id, meeting_date, meeting_time, meeting_link')
+    .eq('student_id', studentId)
+    .gte('meeting_date', fromDate)
+    .order('meeting_date')
+    .order('meeting_time')
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? mapMeeting(data as DbStudentMeeting) : null;
+}
+
+/** Student IDs that have a meeting in [fromDate, toDate] inclusive. */
+export async function fetchStudentIdsWithMeetingsInRange(
+  fromDate: string,
+  toDate: string,
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('student_meetings')
+    .select('student_id')
+    .gte('meeting_date', fromDate)
+    .lte('meeting_date', toDate);
+
+  if (error) throw error;
+
+  return new Set((data ?? []).map((row) => row.student_id as string));
+}
+
+export async function upsertMeeting(input: {
+  studentId: string;
+  meetingDate: string;
+  meetingTime: string;
+  meetingLink: string;
+}): Promise<StudentMeeting> {
+  const { data, error } = await supabase
+    .from('student_meetings')
+    .upsert(
+      {
+        student_id: input.studentId,
+        meeting_date: input.meetingDate,
+        meeting_time: input.meetingTime,
+        meeting_link: normalizeMeetingLink(input.meetingLink),
+      },
+      { onConflict: 'student_id,meeting_date' },
+    )
+    .select('id, student_id, meeting_date, meeting_time, meeting_link')
+    .single();
+
+  if (error) throw error;
+  return mapMeeting(data as DbStudentMeeting);
+}
+
+export async function deleteMeeting(meetingId: string): Promise<void> {
+  const { error } = await supabase.from('student_meetings').delete().eq('id', meetingId);
   if (error) throw error;
 }
 

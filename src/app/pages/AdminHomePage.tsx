@@ -1,19 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Video } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import styled, { css } from 'styled-components';
 import {
   createTask,
+  deleteMeeting,
   deleteTask,
   exportOrganizationJson,
   exportStudentJson,
   fetchAdminNotesForRange,
   fetchOrgTasksForDates,
+  fetchStudentIdsWithMeetingsInRange,
   fetchStudents,
   fetchSubmissionsForRange,
   fetchTasksForRange,
+  fetchUpcomingMeeting,
   getSubmissionForDate,
   updateTaskLabel,
   upsertAdminNote,
+  upsertMeeting,
 } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
 import { AdminEditableTaskList } from '../components/AdminEditableTaskList';
@@ -35,10 +40,17 @@ import {
 } from '../components/AppShell';
 import { DaySlider, TextButton } from '../components/AppUi';
 import { DayAdminNote } from '../components/DayAdminNote';
+import { MeetingPanel } from '../components/MeetingPanel';
 import { SubmissionForm } from '../components/SubmissionForm';
-import type { DailySubmission, StudentSummary, StudentTask } from '../types';
+import type { DailySubmission, StudentMeeting, StudentSummary, StudentTask } from '../types';
 import { downloadJson } from '../utils/download';
-import { buildWeekDays, formatDayHeading, startOfDay, toDateKey } from '../utils/dates';
+import {
+  addDaysToDateKey,
+  buildWeekDays,
+  formatDayHeading,
+  startOfDay,
+  toDateKey,
+} from '../utils/dates';
 
 const TODAY_INDEX = 1;
 
@@ -257,6 +269,18 @@ const StatusPill = styled.span<{ $tone?: CompletionTone; $ready?: boolean }>`
     `}
 `;
 
+const MeetingAlertPill = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 138, 101, 0.55);
+  background: rgba(230, 74, 25, 0.28);
+  color: rgba(255, 204, 188, 0.98);
+`;
+
 function getTodayAndTomorrowKeys(anchor = new Date()) {
   const today = startOfDay(anchor);
   const tomorrow = new Date(today);
@@ -317,16 +341,26 @@ export function AdminHomePage() {
   const weekFrom = toDateKey(weekDays[0]);
   const weekTo = toDateKey(weekDays[weekDays.length - 1]);
   const { todayKey, tomorrowKey } = useMemo(() => getTodayAndTomorrowKeys(), []);
+  const meetingAlertToKey = useMemo(() => addDaysToDateKey(todayKey, 2), [todayKey]);
   const [students, setStudents] = useState<StudentSummary[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [selectedDayIndex, setSelectedDayIndex] = useState(TODAY_INDEX);
   const [tasksByDate, setTasksByDate] = useState<Record<string, StudentTask[]>>({});
   const [submissionsByDate, setSubmissionsByDate] = useState<Record<string, DailySubmission>>({});
   const [adminNotesByDate, setAdminNotesByDate] = useState<Record<string, string>>({});
+  const [upcomingMeeting, setUpcomingMeeting] = useState<StudentMeeting | null>(null);
+  const [studentsWithUpcomingMeeting, setStudentsWithUpcomingMeeting] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [studentStatuses, setStudentStatuses] = useState<Record<string, StudentStatus>>({});
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [error, setError] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+
+  const refreshMeetingAlerts = useCallback(async () => {
+    const ids = await fetchStudentIdsWithMeetingsInRange(todayKey, meetingAlertToKey);
+    setStudentsWithUpcomingMeeting(ids);
+  }, [todayKey, meetingAlertToKey]);
 
   const refreshStudentStatuses = useCallback(
     async (studentIds: string[]) => {
@@ -367,7 +401,10 @@ export function AdminHomePage() {
         if (!isMounted) return;
         setStudents(rows);
         setSelectedStudentId((current) => current || rows[0]?.id || '');
-        await refreshStudentStatuses(rows.map((row) => row.id));
+        await Promise.all([
+          refreshStudentStatuses(rows.map((row) => row.id)),
+          refreshMeetingAlerts(),
+        ]);
       } catch {
         if (isMounted) setError('Öğrenci listesi yüklenemedi.');
       } finally {
@@ -379,7 +416,7 @@ export function AdminHomePage() {
     return () => {
       isMounted = false;
     };
-  }, [user, refreshStudentStatuses]);
+  }, [user, refreshStudentStatuses, refreshMeetingAlerts]);
 
   useEffect(() => {
     if (!selectedStudentId) return;
@@ -390,16 +427,18 @@ export function AdminHomePage() {
 
     const loadStudentWeek = async () => {
       try {
-        const [tasks, submissions, adminNotes] = await Promise.all([
+        const [tasks, submissions, adminNotes, meeting] = await Promise.all([
           fetchTasksForRange(selectedStudentId, weekFrom, weekTo),
           fetchSubmissionsForRange(selectedStudentId, weekFrom, weekTo),
           fetchAdminNotesForRange(selectedStudentId, weekFrom, weekTo),
+          fetchUpcomingMeeting(selectedStudentId, todayKey),
         ]);
 
         if (!isMounted) return;
         setTasksByDate(tasks);
         setSubmissionsByDate(submissions);
         setAdminNotesByDate(adminNotes);
+        setUpcomingMeeting(meeting);
         syncSelectedStudentStatus(selectedStudentId, tasks);
       } catch {
         if (isMounted) setError('Öğrenci verileri yüklenemedi.');
@@ -412,7 +451,7 @@ export function AdminHomePage() {
     return () => {
       isMounted = false;
     };
-  }, [selectedStudentId, weekFrom, weekTo, syncSelectedStudentStatus]);
+  }, [selectedStudentId, weekFrom, weekTo, todayKey, syncSelectedStudentStatus]);
 
   if (isLoading) {
     return (
@@ -517,6 +556,33 @@ export function AdminHomePage() {
     }));
   };
 
+  const handleSaveMeeting = async (input: {
+    meetingDate: string;
+    meetingTime: string;
+    meetingLink: string;
+  }) => {
+    if (!selectedStudent) return;
+    if (upcomingMeeting && upcomingMeeting.meetingDate !== input.meetingDate) {
+      await deleteMeeting(upcomingMeeting.id);
+    }
+    const saved = await upsertMeeting({
+      studentId: selectedStudent.id,
+      meetingDate: input.meetingDate,
+      meetingTime: input.meetingTime,
+      meetingLink: input.meetingLink,
+    });
+    const nextUpcoming = await fetchUpcomingMeeting(selectedStudent.id, todayKey);
+    setUpcomingMeeting(nextUpcoming ?? (saved.meetingDate >= todayKey ? saved : null));
+    await refreshMeetingAlerts();
+  };
+
+  const handleDeleteMeeting = async (meetingId: string) => {
+    if (!selectedStudent) return;
+    await deleteMeeting(meetingId);
+    setUpcomingMeeting(await fetchUpcomingMeeting(selectedStudent.id, todayKey));
+    await refreshMeetingAlerts();
+  };
+
   const handleExportStudent = async () => {
     if (!selectedStudent) return;
 
@@ -609,6 +675,11 @@ export function AdminHomePage() {
                       Yarın {tomorrowReady ? '✅' : '❌'}
                     </StatusPill>
                     <StatusPill $tone={todayTone}>{todayLabel}</StatusPill>
+                    {studentsWithUpcomingMeeting.has(student.id) ? (
+                      <MeetingAlertPill title="Yaklaşan görüşme" aria-label="Yaklaşan görüşme">
+                        <Video size={13} strokeWidth={2.4} />
+                      </MeetingAlertPill>
+                    ) : null}
                   </StatusPills>
                 </StudentListButton>
               );
@@ -657,14 +728,25 @@ export function AdminHomePage() {
                     </AdminCard>
                   </DetailColumnStack>
 
-                  <AdminCard>
-                    <AppCardTitle>Günlük form</AppCardTitle>
-                    <SubmissionForm
-                      value={submission}
-                      onChange={() => undefined}
-                      readOnly
-                    />
-                  </AdminCard>
+                  <DetailColumnStack>
+                    <AdminCard>
+                      <AppCardTitle>Günlük form</AppCardTitle>
+                      <SubmissionForm
+                        value={submission}
+                        onChange={() => undefined}
+                        readOnly
+                      />
+                    </AdminCard>
+
+                    <AdminCard>
+                      <AppCardTitle>Görüşme</AppCardTitle>
+                      <MeetingPanel
+                        meeting={upcomingMeeting}
+                        onSave={handleSaveMeeting}
+                        onDelete={handleDeleteMeeting}
+                      />
+                    </AdminCard>
+                  </DetailColumnStack>
                 </AdminDetailGrid>
               </>
             ) : (
