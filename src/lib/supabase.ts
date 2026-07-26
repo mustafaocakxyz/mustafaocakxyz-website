@@ -24,6 +24,7 @@ export type DbDailyTask = {
   student_id: string;
   task_date: string;
   label: string;
+  duration_label?: string;
   completed: boolean;
   sort_order: number;
 };

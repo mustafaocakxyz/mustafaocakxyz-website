@@ -11,6 +11,8 @@ export type AppUser = {
 export type StudentTask = {
   id: string;
   label: string;
+  /** Parsed estimate, e.g. "2 saat" / "30 dak". Empty if none. */
+  durationLabel: string;
   completed: boolean;
 };
 

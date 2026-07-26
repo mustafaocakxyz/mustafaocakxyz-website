@@ -17,6 +17,7 @@ function createInitialTasks(
   return templates.map((label, index) => ({
     id: `${studentId}-${dateKey}-task-${index}`,
     label,
+    durationLabel: '',
     completed: index === 0 && dateKey === toDateKey(new Date()),
   }));
 }

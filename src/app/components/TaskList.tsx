@@ -1,6 +1,7 @@
 import styled from 'styled-components';
 import { Check } from 'lucide-react';
 import type { StudentTask } from '../types';
+import { TaskDurationPill } from './TaskDurationPill';
 
 type TaskListProps = {
   tasks: StudentTask[];
@@ -59,6 +60,8 @@ const CheckboxVisual = styled.span<{ $checked: boolean }>`
 `;
 
 const TaskLabel = styled.span<{ $completed: boolean }>`
+  flex: 1;
+  min-width: 0;
   font-size: 0.95rem;
   line-height: 1.4;
   color: ${({ $completed }) =>
@@ -95,6 +98,9 @@ export function TaskList({ tasks, onToggle, readOnly = false }: TaskListProps) {
             {task.completed ? <Check size={14} strokeWidth={3} /> : null}
           </CheckboxVisual>
           <TaskLabel $completed={task.completed}>{task.label}</TaskLabel>
+          {task.durationLabel ? (
+            <TaskDurationPill $muted={task.completed}>{task.durationLabel}</TaskDurationPill>
+          ) : null}
         </TaskRow>
       ))}
     </TaskStack>

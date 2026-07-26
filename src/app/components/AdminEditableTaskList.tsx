@@ -3,6 +3,8 @@ import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import styled from 'styled-components';
 import { getFormAccent } from '../../styles/formTheme';
 import type { StudentTask } from '../types';
+import { composeTaskLabel } from '../utils/taskLabel';
+import { TaskDurationPill } from './TaskDurationPill';
 
 const accent = getFormAccent('blue');
 
@@ -157,7 +159,7 @@ export function AdminEditableTaskList({
 
   const startEditing = (task: StudentTask) => {
     setEditingTaskId(task.id);
-    setEditingLabel(task.label);
+    setEditingLabel(composeTaskLabel(task.label, task.durationLabel));
   };
 
   const cancelEditing = () => {
@@ -205,7 +207,14 @@ export function AdminEditableTaskList({
                   }}
                 />
               ) : (
-                <TaskLabel $completed={task.completed}>{task.label}</TaskLabel>
+                <>
+                  <TaskLabel $completed={task.completed}>{task.label}</TaskLabel>
+                  {task.durationLabel ? (
+                    <TaskDurationPill $muted={task.completed}>
+                      {task.durationLabel}
+                    </TaskDurationPill>
+                  ) : null}
+                </>
               )}
 
               {isEditing ? (
@@ -243,7 +252,7 @@ export function AdminEditableTaskList({
 
       <AddRow>
         <AddInput
-          placeholder="Yeni görev ekle..."
+          placeholder="Örn. TYT Mat | Soru Çözümü | 2 saat"
           value={newTaskLabel}
           onChange={(event) => setNewTaskLabel(event.target.value)}
           onKeyDown={(event) => {

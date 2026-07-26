@@ -1,4 +1,5 @@
 import { startOfDay } from '../app/utils/dates';
+import { parseTaskLabel } from '../app/utils/taskLabel';
 import { DEMO_STUDENTS, type DemoStudentShowcase } from '../data/demoStudentShowcase';
 import { supabase } from './supabase';
 
@@ -92,6 +93,7 @@ export async function fetchShowcaseStudentById(
 export type PublicTodayTask = {
   id: string;
   label: string;
+  durationLabel: string;
   completed: boolean;
 };
 
@@ -105,9 +107,27 @@ export async function fetchPublicStudentTodayTasks(
   if (error) throw error;
 
   const rows = Array.isArray(data) ? data : [];
-  return rows.map((row: Record<string, unknown>) => ({
-    id: String(row.id),
-    label: String(row.label ?? ''),
-    completed: Boolean(row.completed),
-  }));
+  return rows.map((row: Record<string, unknown>) => {
+    const rawLabel = String(row.label ?? '');
+    const storedDuration = String(
+      row.durationLabel ?? row.duration_label ?? '',
+    ).trim();
+
+    if (storedDuration) {
+      return {
+        id: String(row.id),
+        label: rawLabel,
+        durationLabel: storedDuration,
+        completed: Boolean(row.completed),
+      };
+    }
+
+    const parsed = parseTaskLabel(rawLabel);
+    return {
+      id: String(row.id),
+      label: parsed.label,
+      durationLabel: parsed.durationLabel,
+      completed: Boolean(row.completed),
+    };
+  });
 }

@@ -14,11 +14,25 @@ import {
   type StudentTask,
 } from '../types';
 import { normalizeMeetingLink, toDateKey } from '../utils/dates';
+import { parseTaskLabel } from '../utils/taskLabel';
 
 function mapTask(row: DbDailyTask): StudentTask {
+  const storedDuration = (row.duration_label ?? '').trim();
+  if (storedDuration) {
+    return {
+      id: row.id,
+      label: row.label,
+      durationLabel: storedDuration,
+      completed: row.completed,
+    };
+  }
+
+  // Legacy rows: duration still embedded in label
+  const parsed = parseTaskLabel(row.label);
   return {
     id: row.id,
-    label: row.label,
+    label: parsed.label,
+    durationLabel: parsed.durationLabel,
     completed: row.completed,
   };
 }
@@ -110,7 +124,7 @@ export async function fetchTasksForRange(
 ): Promise<Record<string, StudentTask[]>> {
   const { data, error } = await supabase
     .from('daily_tasks')
-    .select('id, student_id, task_date, label, completed, sort_order')
+    .select('id, student_id, task_date, label, duration_label, completed, sort_order')
     .eq('student_id', studentId)
     .gte('task_date', fromDate)
     .lte('task_date', toDate)
@@ -137,7 +151,7 @@ export async function fetchOrgTasksForDates(
 
   const { data, error } = await supabase
     .from('daily_tasks')
-    .select('id, student_id, task_date, label, completed, sort_order')
+    .select('id, student_id, task_date, label, duration_label, completed, sort_order')
     .in('task_date', dates)
     .order('sort_order')
     .order('created_at');
@@ -306,16 +320,18 @@ export async function upsertSubmission(
 }
 
 export async function createTask(studentId: string, dateKey: string, label: string, sortOrder: number) {
+  const parsed = parseTaskLabel(label);
   const { data, error } = await supabase
     .from('daily_tasks')
     .insert({
       student_id: studentId,
       task_date: dateKey,
-      label,
+      label: parsed.label,
+      duration_label: parsed.durationLabel,
       sort_order: sortOrder,
       completed: false,
     })
-    .select('id, student_id, task_date, label, completed, sort_order')
+    .select('id, student_id, task_date, label, duration_label, completed, sort_order')
     .single();
 
   if (error) throw error;
@@ -323,8 +339,13 @@ export async function createTask(studentId: string, dateKey: string, label: stri
 }
 
 export async function updateTaskLabel(taskId: string, label: string) {
-  const { error } = await supabase.from('daily_tasks').update({ label }).eq('id', taskId);
+  const parsed = parseTaskLabel(label);
+  const { error } = await supabase
+    .from('daily_tasks')
+    .update({ label: parsed.label, duration_label: parsed.durationLabel })
+    .eq('id', taskId);
   if (error) throw error;
+  return parsed;
 }
 
 export async function deleteTask(taskId: string) {

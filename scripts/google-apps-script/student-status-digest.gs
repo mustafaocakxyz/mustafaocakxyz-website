@@ -89,16 +89,30 @@ function buildDigestEmail(digest) {
       var todayInfo = s.today || {};
       var percent = todayInfo.percent;
       var circle = digestCompletionCircle(percent);
-      var percentLabel =
-        percent === null || percent === undefined
-          ? '— (görev yok)'
-          : '%' +
-            percent +
-            ' (' +
-            (todayInfo.completed || 0) +
-            '/' +
-            (todayInfo.total || 0) +
-            ')';
+      var totalMinutes = Number(todayInfo.totalMinutes || 0);
+      var completedMinutes = Number(todayInfo.completedMinutes || 0);
+      var percentLabel;
+      if (percent === null || percent === undefined) {
+        percentLabel = '— (görev yok)';
+      } else if (totalMinutes > 0) {
+        percentLabel =
+          '%' +
+          percent +
+          ' (' +
+          completedMinutes +
+          '/' +
+          totalMinutes +
+          ' dk)';
+      } else {
+        percentLabel =
+          '%' +
+          percent +
+          ' (' +
+          (todayInfo.completed || 0) +
+          '/' +
+          (todayInfo.total || 0) +
+          ')';
+      }
       var tomorrowEmoji = s.tomorrowReady ? '✅' : '❌';
 
       lines.push(

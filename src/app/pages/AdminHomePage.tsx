@@ -51,6 +51,7 @@ import {
   startOfDay,
   toDateKey,
 } from '../utils/dates';
+import { computeCompletionPercent } from '../utils/taskLabel';
 
 const TODAY_INDEX = 1;
 
@@ -311,8 +312,7 @@ function buildStudentStatus(
     };
   }
 
-  const completedCount = todayTasks.filter((task) => task.completed).length;
-  const todayPercent = Math.round((completedCount / todayTasks.length) * 100);
+  const todayPercent = computeCompletionPercent(todayTasks) ?? 0;
 
   return {
     tomorrowReady,
@@ -513,12 +513,18 @@ export function AdminHomePage() {
     if (!selectedStudent) return;
 
     try {
-      await updateTaskLabel(taskId, label);
+      const parsed = await updateTaskLabel(taskId, label);
       setTasksByDate((current) => {
         const next = {
           ...current,
           [selectedDateKey]: (current[selectedDateKey] ?? []).map((task) =>
-            task.id === taskId ? { ...task, label } : task,
+            task.id === taskId
+              ? {
+                  ...task,
+                  label: parsed.label,
+                  durationLabel: parsed.durationLabel,
+                }
+              : task,
           ),
         };
         syncSelectedStudentStatus(selectedStudent.id, next);
