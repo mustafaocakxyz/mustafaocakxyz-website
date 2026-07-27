@@ -13,7 +13,7 @@ import {
   type StudentSummary,
   type StudentTask,
 } from '../types';
-import { normalizeMeetingLink, toDateKey } from '../utils/dates';
+import { isMeetingInFuture, normalizeMeetingLink, toDateKey } from '../utils/dates';
 import { parseTaskLabel } from '../utils/taskLabel';
 
 function mapTask(row: DbDailyTask): StudentTask {
@@ -243,39 +243,59 @@ function mapMeeting(row: DbStudentMeeting): StudentMeeting {
   };
 }
 
-/** Next meeting on/after fromDate (defaults to today local). */
-export async function fetchUpcomingMeeting(
+export async function fetchMeetingsForRange(
   studentId: string,
-  fromDate = toDateKey(new Date()),
-): Promise<StudentMeeting | null> {
+  fromDate: string,
+  toDate: string,
+): Promise<Record<string, StudentMeeting>> {
   const { data, error } = await supabase
     .from('student_meetings')
     .select('id, student_id, meeting_date, meeting_time, meeting_link')
     .eq('student_id', studentId)
     .gte('meeting_date', fromDate)
+    .lte('meeting_date', toDate)
     .order('meeting_date')
-    .order('meeting_time')
-    .limit(1)
-    .maybeSingle();
+    .order('meeting_time');
 
   if (error) throw error;
-  return data ? mapMeeting(data as DbStudentMeeting) : null;
+
+  const grouped: Record<string, StudentMeeting> = {};
+  for (const row of data ?? []) {
+    const meeting = mapMeeting(row as DbStudentMeeting);
+    grouped[meeting.meetingDate] = meeting;
+  }
+  return grouped;
 }
 
-/** Student IDs that have a meeting in [fromDate, toDate] inclusive. */
+/**
+ * Student IDs with a meeting in [fromDate, toDate] whose date+time is still in the future.
+ */
 export async function fetchStudentIdsWithMeetingsInRange(
   fromDate: string,
   toDate: string,
 ): Promise<Set<string>> {
   const { data, error } = await supabase
     .from('student_meetings')
-    .select('student_id')
+    .select('student_id, meeting_date, meeting_time')
     .gte('meeting_date', fromDate)
     .lte('meeting_date', toDate);
 
   if (error) throw error;
 
-  return new Set((data ?? []).map((row) => row.student_id as string));
+  const now = new Date();
+  const ids = new Set<string>();
+  for (const row of data ?? []) {
+    if (
+      isMeetingInFuture(
+        String(row.meeting_date),
+        String(row.meeting_time ?? '00:00'),
+        now,
+      )
+    ) {
+      ids.add(row.student_id as string);
+    }
+  }
+  return ids;
 }
 
 export async function upsertMeeting(input: {

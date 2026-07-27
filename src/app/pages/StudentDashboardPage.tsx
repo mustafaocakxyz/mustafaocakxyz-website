@@ -3,9 +3,9 @@ import { Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
   fetchAdminNotesForRange,
+  fetchMeetingsForRange,
   fetchSubmissionsForRange,
   fetchTasksForRange,
-  fetchUpcomingMeeting,
   getSubmissionForDate,
   setTaskCompleted,
   upsertSubmission,
@@ -46,12 +46,11 @@ export function StudentDashboardPage() {
   const weekDays = useMemo(() => buildWeekDays(), []);
   const weekFrom = toDateKey(weekDays[0]);
   const weekTo = toDateKey(weekDays[weekDays.length - 1]);
-  const todayKey = toDateKey(weekDays[TODAY_INDEX]);
   const [selectedIndex, setSelectedIndex] = useState(TODAY_INDEX);
   const [tasksByDate, setTasksByDate] = useState<Record<string, StudentTask[]>>({});
   const [submissionsByDate, setSubmissionsByDate] = useState<Record<string, DailySubmission>>({});
   const [adminNotesByDate, setAdminNotesByDate] = useState<Record<string, string>>({});
-  const [upcomingMeeting, setUpcomingMeeting] = useState<StudentMeeting | null>(null);
+  const [meetingsByDate, setMeetingsByDate] = useState<Record<string, StudentMeeting>>({});
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [error, setError] = useState('');
   const skipSubmissionSave = useRef(true);
@@ -65,18 +64,18 @@ export function StudentDashboardPage() {
 
     const loadWeek = async () => {
       try {
-        const [tasks, submissions, adminNotes, meeting] = await Promise.all([
+        const [tasks, submissions, adminNotes, meetings] = await Promise.all([
           fetchTasksForRange(user.id, weekFrom, weekTo),
           fetchSubmissionsForRange(user.id, weekFrom, weekTo),
           fetchAdminNotesForRange(user.id, weekFrom, weekTo),
-          fetchUpcomingMeeting(user.id, todayKey),
+          fetchMeetingsForRange(user.id, weekFrom, weekTo),
         ]);
 
         if (!isMounted) return;
         setTasksByDate(tasks);
         setSubmissionsByDate(submissions);
         setAdminNotesByDate(adminNotes);
-        setUpcomingMeeting(meeting);
+        setMeetingsByDate(meetings);
         skipSubmissionSave.current = true;
       } catch {
         if (isMounted) setError('Veriler yüklenemedi.');
@@ -89,13 +88,14 @@ export function StudentDashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, [user, weekFrom, weekTo, todayKey]);
+  }, [user, weekFrom, weekTo]);
 
   const selectedDate = weekDays[selectedIndex];
   const selectedDateKey = toDateKey(selectedDate);
   const tasks = tasksByDate[selectedDateKey] ?? [];
   const submission = getSubmissionForDate(submissionsByDate, selectedDateKey);
   const adminNote = adminNotesByDate[selectedDateKey] ?? '';
+  const selectedMeeting = meetingsByDate[selectedDateKey] ?? null;
 
   useEffect(() => {
     if (!user || user.role !== 'student' || isPageLoading) return;
@@ -194,10 +194,10 @@ export function StudentDashboardPage() {
               <SubmissionForm value={submission} onChange={handleSubmissionChange} />
             </AppCard>
 
-            {upcomingMeeting ? (
+            {selectedMeeting ? (
               <AppCard>
                 <AppCardTitle>Görüşme</AppCardTitle>
-                <MeetingPanel meeting={upcomingMeeting} readOnly />
+                <MeetingPanel meeting={selectedMeeting} readOnly />
               </AppCard>
             ) : null}
           </DetailColumnStack>

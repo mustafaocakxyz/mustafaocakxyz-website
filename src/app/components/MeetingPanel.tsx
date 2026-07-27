@@ -16,6 +16,8 @@ const accent = getFormAccent('blue');
 
 type MeetingPanelProps = {
   meeting: StudentMeeting | null;
+  /** When creating a new meeting, prefer this date if it is in the day picker. */
+  preferredDateKey?: string;
   readOnly?: boolean;
   onSave?: (input: {
     meetingDate: string;
@@ -199,13 +201,25 @@ function formatMeetingWhenShort(meeting: StudentMeeting): string {
 
 export function MeetingPanel({
   meeting,
+  preferredDateKey,
   readOnly = false,
   onSave,
   onDelete,
 }: MeetingPanelProps) {
   const dayOptions = useMemo(() => buildUpcomingDays(10), []);
+  const dayOptionKeys = useMemo(
+    () => dayOptions.map((day) => toDateKey(day)),
+    [dayOptions],
+  );
+  const fallbackDateKey = useMemo(() => {
+    if (preferredDateKey && dayOptionKeys.includes(preferredDateKey)) {
+      return preferredDateKey;
+    }
+    return dayOptionKeys[0] ?? toDateKey(new Date());
+  }, [preferredDateKey, dayOptionKeys]);
+
   const [isEditing, setIsEditing] = useState(false);
-  const [dateKey, setDateKey] = useState(toDateKey(dayOptions[0]));
+  const [dateKey, setDateKey] = useState(fallbackDateKey);
   const [hour, setHour] = useState('12');
   const [minute, setMinute] = useState('00');
   const [link, setLink] = useState('');
@@ -222,14 +236,14 @@ export function MeetingPanel({
       setLink(meeting.meetingLink);
       setIsEditing(false);
     } else {
-      setDateKey(toDateKey(dayOptions[0]));
+      setDateKey(fallbackDateKey);
       setHour('12');
       setMinute('00');
       setLink('');
       setIsEditing(false);
     }
     setStatus(null);
-  }, [meeting, dayOptions]);
+  }, [meeting, fallbackDateKey]);
 
   if (readOnly) {
     if (!meeting) return null;

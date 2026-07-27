@@ -9,12 +9,12 @@ import {
   exportOrganizationJson,
   exportStudentJson,
   fetchAdminNotesForRange,
+  fetchMeetingsForRange,
   fetchOrgTasksForDates,
   fetchStudentIdsWithMeetingsInRange,
   fetchStudents,
   fetchSubmissionsForRange,
   fetchTasksForRange,
-  fetchUpcomingMeeting,
   getSubmissionForDate,
   updateTaskLabel,
   upsertAdminNote,
@@ -348,7 +348,7 @@ export function AdminHomePage() {
   const [tasksByDate, setTasksByDate] = useState<Record<string, StudentTask[]>>({});
   const [submissionsByDate, setSubmissionsByDate] = useState<Record<string, DailySubmission>>({});
   const [adminNotesByDate, setAdminNotesByDate] = useState<Record<string, string>>({});
-  const [upcomingMeeting, setUpcomingMeeting] = useState<StudentMeeting | null>(null);
+  const [meetingsByDate, setMeetingsByDate] = useState<Record<string, StudentMeeting>>({});
   const [studentsWithUpcomingMeeting, setStudentsWithUpcomingMeeting] = useState<Set<string>>(
     () => new Set(),
   );
@@ -427,18 +427,18 @@ export function AdminHomePage() {
 
     const loadStudentWeek = async () => {
       try {
-        const [tasks, submissions, adminNotes, meeting] = await Promise.all([
+        const [tasks, submissions, adminNotes, meetings] = await Promise.all([
           fetchTasksForRange(selectedStudentId, weekFrom, weekTo),
           fetchSubmissionsForRange(selectedStudentId, weekFrom, weekTo),
           fetchAdminNotesForRange(selectedStudentId, weekFrom, weekTo),
-          fetchUpcomingMeeting(selectedStudentId, todayKey),
+          fetchMeetingsForRange(selectedStudentId, weekFrom, weekTo),
         ]);
 
         if (!isMounted) return;
         setTasksByDate(tasks);
         setSubmissionsByDate(submissions);
         setAdminNotesByDate(adminNotes);
-        setUpcomingMeeting(meeting);
+        setMeetingsByDate(meetings);
         syncSelectedStudentStatus(selectedStudentId, tasks);
       } catch {
         if (isMounted) setError('Öğrenci verileri yüklenemedi.');
@@ -451,7 +451,7 @@ export function AdminHomePage() {
     return () => {
       isMounted = false;
     };
-  }, [selectedStudentId, weekFrom, weekTo, todayKey, syncSelectedStudentStatus]);
+  }, [selectedStudentId, weekFrom, weekTo, syncSelectedStudentStatus]);
 
   if (isLoading) {
     return (
@@ -475,6 +475,7 @@ export function AdminHomePage() {
   const tasks = tasksByDate[selectedDateKey] ?? [];
   const submission = getSubmissionForDate(submissionsByDate, selectedDateKey);
   const adminNote = adminNotesByDate[selectedDateKey] ?? '';
+  const selectedMeeting = meetingsByDate[selectedDateKey] ?? null;
   const sortedStudents = [...students].sort((a, b) => {
     const aPercent = studentStatuses[a.id]?.todayPercent;
     const bPercent = studentStatuses[b.id]?.todayPercent;
@@ -568,8 +569,8 @@ export function AdminHomePage() {
     meetingLink: string;
   }) => {
     if (!selectedStudent) return;
-    if (upcomingMeeting && upcomingMeeting.meetingDate !== input.meetingDate) {
-      await deleteMeeting(upcomingMeeting.id);
+    if (selectedMeeting && selectedMeeting.meetingDate !== input.meetingDate) {
+      await deleteMeeting(selectedMeeting.id);
     }
     const saved = await upsertMeeting({
       studentId: selectedStudent.id,
@@ -577,15 +578,27 @@ export function AdminHomePage() {
       meetingTime: input.meetingTime,
       meetingLink: input.meetingLink,
     });
-    const nextUpcoming = await fetchUpcomingMeeting(selectedStudent.id, todayKey);
-    setUpcomingMeeting(nextUpcoming ?? (saved.meetingDate >= todayKey ? saved : null));
+    setMeetingsByDate((current) => {
+      const next = { ...current };
+      if (selectedMeeting && selectedMeeting.meetingDate !== saved.meetingDate) {
+        delete next[selectedMeeting.meetingDate];
+      }
+      next[saved.meetingDate] = saved;
+      return next;
+    });
     await refreshMeetingAlerts();
   };
 
   const handleDeleteMeeting = async (meetingId: string) => {
     if (!selectedStudent) return;
     await deleteMeeting(meetingId);
-    setUpcomingMeeting(await fetchUpcomingMeeting(selectedStudent.id, todayKey));
+    setMeetingsByDate((current) => {
+      const next = { ...current };
+      for (const [dateKey, meeting] of Object.entries(next)) {
+        if (meeting.id === meetingId) delete next[dateKey];
+      }
+      return next;
+    });
     await refreshMeetingAlerts();
   };
 
@@ -747,7 +760,9 @@ export function AdminHomePage() {
                     <AdminCard>
                       <AppCardTitle>Görüşme</AppCardTitle>
                       <MeetingPanel
-                        meeting={upcomingMeeting}
+                        key={`${selectedStudent.id}-${selectedDateKey}-${selectedMeeting?.id ?? 'new'}`}
+                        meeting={selectedMeeting}
+                        preferredDateKey={selectedDateKey}
                         onSave={handleSaveMeeting}
                         onDelete={handleDeleteMeeting}
                       />

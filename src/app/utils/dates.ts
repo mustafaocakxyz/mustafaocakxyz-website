@@ -60,3 +60,17 @@ export function normalizeMeetingLink(raw: string): string {
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   return `https://${trimmed}`;
 }
+
+/** Meeting datetime in Europe/Istanbul (+03). */
+export function meetingDateTimeMs(meetingDate: string, meetingTime: string): number {
+  const time = (meetingTime || '00:00').slice(0, 5);
+  return new Date(`${meetingDate}T${time}:00+03:00`).getTime();
+}
+
+export function isMeetingInFuture(
+  meetingDate: string,
+  meetingTime: string,
+  now = new Date(),
+): boolean {
+  return meetingDateTimeMs(meetingDate, meetingTime) > now.getTime();
+}
