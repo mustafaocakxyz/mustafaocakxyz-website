@@ -13,7 +13,7 @@ import {
   type StudentSummary,
   type StudentTask,
 } from '../types';
-import { isMeetingInFuture, normalizeMeetingLink, toDateKey } from '../utils/dates';
+import { isMeetingInFuture, normalizeMeetingLink } from '../utils/dates';
 import { parseTaskLabel } from '../utils/taskLabel';
 
 function mapTask(row: DbDailyTask): StudentTask {
