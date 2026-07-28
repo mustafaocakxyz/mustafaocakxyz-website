@@ -608,7 +608,7 @@ export function AdminHomePage() {
     setIsExporting(true);
     setError('');
     try {
-      const data = await exportStudentJson(selectedStudent.id, weekFrom, weekTo);
+      const data = await exportStudentJson(selectedStudent.id);
       downloadJson(`${selectedStudent.name}-export.json`, data);
     } catch {
       setError('Öğrenci dışa aktarımı başarısız.');
@@ -621,7 +621,7 @@ export function AdminHomePage() {
     setIsExporting(true);
     setError('');
     try {
-      const data = await exportOrganizationJson(weekFrom, weekTo);
+      const data = await exportOrganizationJson();
       downloadJson('organization-export.json', data);
     } catch {
       setError('Kurum dışa aktarımı başarısız.');
