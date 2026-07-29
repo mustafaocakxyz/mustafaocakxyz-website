@@ -1,5 +1,6 @@
 import { GradientTitle } from '../components/GradientTitle';
 import {
+  PaymentActionRouterLink,
   PaymentContent,
   PaymentOptionCard,
   PaymentOptionLabel,
@@ -33,6 +34,7 @@ const Description = styled.p`
   }
 `;
 
+/* Restore when applications are closed:
 const DisabledActionButton = styled.span`
   display: inline-flex;
   align-items: center;
@@ -55,6 +57,7 @@ const DisabledActionButton = styled.span`
     width: 100%;
   }
 `;
+*/
 
 export function GelisimProgramiBasvuruIntroPage() {
   return (
@@ -67,10 +70,20 @@ export function GelisimProgramiBasvuruIntroPage() {
           Başvurusu kabul edilen öğrenciler ödeme için yönlendirileceklerdir.
           Henüz herhangi bir ödeme yapmayacaksınız.
         </Description>
+        {/* Closed-capacity copy — restore when applications close:
+        <Description>
+          Şu anda bütün kontenjanlarımız dolu. İlgilendiğin için teşekkürler.
+        </Description>
+        */}
 
         <PaymentOptionCard $theme="orange" $delay="0.6s">
           <PaymentOptionLabel>Başvurunu Yap</PaymentOptionLabel>
-          <DisabledActionButton>KONTENJAN DOLU</DisabledActionButton>
+          <PaymentActionRouterLink $theme="orange" to="/gelisim-programi/basvuru">
+            Formu Doldur
+          </PaymentActionRouterLink>
+          {/* Closed-capacity CTA — restore when applications close:
+          <DisabledActionButton>Kontenjan Dolu</DisabledActionButton>
+          */}
         </PaymentOptionCard>
       </PaymentContent>
     </DetailLayout>
