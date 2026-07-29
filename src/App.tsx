@@ -18,6 +18,7 @@ import { OgrenciDetailPage } from './pages/OgrenciDetailPage';
 import { DemoStudentsHubPage } from './pages/demo/DemoStudentsHubPage';
 import { DemoStudentsShowcasePage } from './pages/demo/DemoStudentsShowcasePage';
 import { DemoStudentDetailPage } from './pages/demo/DemoStudentDetailPage';
+import { XAkademiPrivacyPage } from './pages/XAkademiPrivacyPage';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
       <GlobalStyle />
       <Routes>
         <Route path="/app/*" element={<AppRoutes />} />
+        <Route path="/legal/x-akademi-gizlilik" element={<XAkademiPrivacyPage />} />
         <Route path="/register-private" element={<RegisterPrivatePage />} />
         <Route path="/ogrenciler" element={<OgrencilerPage />} />
         <Route path="/ogrenciler/:studentId" element={<OgrenciDetailPage />} />
