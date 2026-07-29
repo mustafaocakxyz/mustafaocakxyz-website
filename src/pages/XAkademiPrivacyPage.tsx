@@ -196,6 +196,12 @@ export function XAkademiPrivacyPage() {
               mustafaocak.xyz
             </a>
           </p>
+          <p>
+            Hesap ve veri silme talebi:{' '}
+            <a href="/legal/x-akademi-hesap-silme" style={{ color: '#90caf9' }}>
+              /legal/x-akademi-hesap-silme
+            </a>
+          </p>
         </Section>
       </Inner>
     </Page>
