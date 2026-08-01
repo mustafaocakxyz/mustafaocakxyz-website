@@ -1,0 +1,25 @@
+/** Design tokens for /app/admin/preview only. See DESIGN_STYLE.md. */
+
+export const preview = {
+  bg: '#0B1D3A',
+  panel: '#0F172A',
+  panel2: '#1E293B',
+  border: 'rgba(148, 163, 184, 0.18)',
+  borderStrong: 'rgba(148, 163, 184, 0.28)',
+  text: 'rgba(248, 250, 252, 0.96)',
+  muted: 'rgba(148, 163, 184, 0.92)',
+  mutedSoft: 'rgba(148, 163, 184, 0.65)',
+  accent: '#C72C79',
+  accentSoft: 'rgba(199, 44, 121, 0.18)',
+  accentBorder: 'rgba(199, 44, 121, 0.45)',
+  success: '#34D399',
+  successSoft: 'rgba(52, 211, 153, 0.16)',
+  warn: '#FBBF24',
+  warnSoft: 'rgba(251, 191, 36, 0.16)',
+  danger: '#F87171',
+  dangerSoft: 'rgba(248, 113, 113, 0.16)',
+  radiusLg: '24px',
+  radiusMd: '16px',
+  radiusSm: '12px',
+  font: "'Nunito', 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+} as const;

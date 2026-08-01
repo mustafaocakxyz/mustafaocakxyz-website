@@ -8,51 +8,34 @@ import {
   updateStudentShowcaseHighlight,
 } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
+import { preview as t } from '../preview/adminPreviewTheme';
 import {
-  AdminCard,
-  AdminContent,
-  AdminShell,
-  AppCardTitle,
-  AppSubtitle,
-  BlueTitle,
-} from '../components/AppShell';
-import { PrimaryButton } from '../components/AppUi';
-import { getFormAccent } from '../../styles/formTheme';
+  AccentButton,
+  ContentCard,
+  ContentSub,
+  ContentTitle,
+  ErrorText,
+  LoadingText,
+  PreviewBody,
+  PreviewFrame,
+  PreviewShell,
+  PreviewTopBar,
+  TopBarActions,
+  TopBarButton,
+  TopBarEnd,
+  TopBarTitle,
+} from '../preview/AdminPreviewUi';
 
-const accent = getFormAccent('blue');
-
-const BackLink = styled(Link)`
-  display: inline-block;
-  margin-bottom: 12px;
-  color: rgba(100, 181, 246, 0.9);
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 500;
-
-  &:hover {
-    color: rgba(144, 202, 249, 1);
-  }
-`;
-
-const LoadingText = styled.p`
-  margin: 0;
-  color: rgba(255, 255, 255, 0.55);
-`;
-
-const ErrorText = styled.p`
-  margin: 0;
-  color: #ff8a80;
-`;
-
-const SuccessText = styled.p`
-  margin: 0;
-  color: rgba(165, 214, 167, 0.95);
+const PageIntro = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 `;
 
 const EditorGrid = styled.div`
   display: grid;
   grid-template-columns: minmax(240px, 300px) 1fr;
-  gap: 20px;
+  gap: 18px;
 
   @media (max-width: 800px) {
     grid-template-columns: 1fr;
@@ -69,12 +52,16 @@ const StudentRow = styled.div<{ $selected: boolean }>`
   display: flex;
   align-items: stretch;
   gap: 6px;
-  border-radius: 14px;
-  border: 1px solid
+  border-radius: ${t.radiusMd};
+  border: 2px solid
     ${({ $selected }) =>
-      $selected ? 'rgba(66, 165, 245, 0.65)' : 'rgba(66, 165, 245, 0.22)'};
+      $selected ? 'rgba(96, 165, 250, 0.55)' : t.border};
   background: ${({ $selected }) =>
-    $selected ? 'rgba(33, 150, 243, 0.2)' : 'rgba(255, 255, 255, 0.04)'};
+    $selected ? 'rgba(59, 130, 246, 0.14)' : t.panel2};
+  box-shadow: ${({ $selected }) =>
+    $selected
+      ? '0 0 0 1px rgba(96, 165, 250, 0.2), 0 0 20px rgba(59, 130, 246, 0.28)'
+      : 'none'};
 `;
 
 const StudentButton = styled.button`
@@ -83,11 +70,11 @@ const StudentButton = styled.button`
   text-align: left;
   padding: 12px 14px;
   border: none;
-  border-radius: 14px;
+  border-radius: ${t.radiusMd};
   background: transparent;
-  color: rgba(255, 255, 255, 0.9);
+  color: ${t.text};
   font-size: 0.92rem;
-  font-weight: 500;
+  font-weight: 800;
   font-family: inherit;
   cursor: pointer;
 `;
@@ -108,12 +95,13 @@ const OrderButton = styled.button`
   height: 22px;
   border: none;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(144, 202, 249, 0.95);
+  background: rgba(15, 23, 42, 0.55);
+  color: ${t.muted};
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.12);
+    color: ${t.text};
+    background: rgba(59, 130, 246, 0.18);
   }
 
   &:disabled {
@@ -129,19 +117,24 @@ const FieldsStack = styled.div`
 `;
 
 const FieldLabel = styled.label`
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.75);
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: ${t.muted};
 `;
 
 const HighlightTextarea = styled.textarea`
   width: 100%;
+  box-sizing: border-box;
   min-height: 120px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid ${accent.inputBorder};
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.95);
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: ${t.radiusSm};
+  border: 1px solid ${t.border};
+  background: ${t.panel2};
+  color: ${t.text};
   font-size: 0.95rem;
   font-family: inherit;
   line-height: 1.5;
@@ -149,19 +142,19 @@ const HighlightTextarea = styled.textarea`
   outline: none;
 
   &:focus {
-    border-color: ${accent.inputBorderFocus};
-    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(96, 165, 250, 0.55);
+    background: rgba(30, 41, 59, 0.92);
   }
 
   &::placeholder {
-    color: rgba(255, 255, 255, 0.3);
+    color: ${t.mutedSoft};
   }
 `;
 
 const Hint = styled.p`
   margin: 0;
   font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.45);
+  color: ${t.mutedSoft};
   line-height: 1.45;
 `;
 
@@ -171,16 +164,11 @@ const SaveRow = styled.div`
   gap: 12px;
 `;
 
-const SaveButton = styled(PrimaryButton)`
-  width: auto;
-  min-width: 140px;
-  padding: 12px 22px;
-
-  &:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-    transform: none;
-  }
+const SuccessText = styled.p`
+  margin: 0;
+  color: ${t.success};
+  font-size: 0.9rem;
+  font-weight: 600;
 `;
 
 type StudentHighlight = {
@@ -237,9 +225,11 @@ export function AdminShowcasePage() {
 
   if (isLoading) {
     return (
-      <AdminShell>
-        <LoadingText>Yükleniyor...</LoadingText>
-      </AdminShell>
+      <PreviewShell>
+        <PreviewFrame>
+          <LoadingText>Yükleniyor...</LoadingText>
+        </PreviewFrame>
+      </PreviewShell>
     );
   }
 
@@ -304,90 +294,101 @@ export function AdminShowcasePage() {
   };
 
   return (
-    <AdminShell>
-      <AdminContent>
-        <div>
-          <BackLink to="/app/admin">← Admin paneline dön</BackLink>
-          <BlueTitle>Kayda değer</BlueTitle>
-          <AppSubtitle style={{ marginTop: 8 }}>
-            Öğrenci seçip serbest metin gir. Soldaki oklarla /ogrenciler sırasını
-            değiştir. Boş bırakırsan öne çıkan kart gizlenir.
-          </AppSubtitle>
-        </div>
+    <PreviewShell>
+      <PreviewTopBar>
+        <TopBarTitle>Kayda değer</TopBarTitle>
+        <TopBarActions>
+          <TopBarButton as={Link} to="/app/admin">
+            ← Admin paneline dön
+          </TopBarButton>
+        </TopBarActions>
+        <TopBarEnd />
+      </PreviewTopBar>
 
-        {error ? <ErrorText>{error}</ErrorText> : null}
-        {isPageLoading ? <LoadingText>Yükleniyor...</LoadingText> : null}
+      <PreviewBody>
+        <PreviewFrame>
+          <PageIntro>
+            <ContentSub>
+              Öğrenci seçip serbest metin gir. Soldaki oklarla /ogrenciler sırasını
+              değiştir. Boş bırakırsan öne çıkan kart gizlenir.
+            </ContentSub>
+          </PageIntro>
 
-        <EditorGrid>
-          <AdminCard>
-            <AppCardTitle>Öğrenciler</AppCardTitle>
-            <StudentList>
-              {students.map((student, index) => (
-                <StudentRow key={student.id} $selected={student.id === selectedId}>
-                  <StudentButton type="button" onClick={() => setSelectedId(student.id)}>
-                    {student.name}
-                  </StudentButton>
-                  <OrderControls>
-                    <OrderButton
+          {error ? <ErrorText>{error}</ErrorText> : null}
+          {isPageLoading ? <LoadingText>Yükleniyor...</LoadingText> : null}
+
+          <EditorGrid>
+            <ContentCard>
+              <ContentTitle>Öğrenciler</ContentTitle>
+              <StudentList>
+                {students.map((student, index) => (
+                  <StudentRow key={student.id} $selected={student.id === selectedId}>
+                    <StudentButton type="button" onClick={() => setSelectedId(student.id)}>
+                      {student.name}
+                    </StudentButton>
+                    <OrderControls>
+                      <OrderButton
+                        type="button"
+                        aria-label="Yukarı taşı"
+                        disabled={index === 0 || isReordering}
+                        onClick={() => void moveStudent(index, -1)}
+                      >
+                        <ChevronUp size={14} />
+                      </OrderButton>
+                      <OrderButton
+                        type="button"
+                        aria-label="Aşağı taşı"
+                        disabled={index === students.length - 1 || isReordering}
+                        onClick={() => void moveStudent(index, 1)}
+                      >
+                        <ChevronDown size={14} />
+                      </OrderButton>
+                    </OrderControls>
+                  </StudentRow>
+                ))}
+                {students.length === 0 && !isPageLoading ? (
+                  <ContentSub>Henüz öğrenci yok.</ContentSub>
+                ) : null}
+              </StudentList>
+            </ContentCard>
+
+            <ContentCard>
+              <ContentTitle>{selected ? selected.name : 'Öğrenci seç'}</ContentTitle>
+              {selected ? (
+                <FieldsStack>
+                  <div>
+                    <FieldLabel htmlFor="showcase-highlight">Öne çıkan başarı metni</FieldLabel>
+                    <HighlightTextarea
+                      id="showcase-highlight"
+                      placeholder="Örn. TYT 24 netten 52 nete çıkardı"
+                      value={draft}
+                      onChange={(event) => {
+                        setDraft(event.target.value);
+                        setSavedMessage('');
+                      }}
+                    />
+                  </div>
+                  <Hint>
+                    Örnekler: “6+ saat çalışma”, “AYT Mat 0 → 16”, “22 gündür aktif”
+                  </Hint>
+                  <SaveRow>
+                    <AccentButton
                       type="button"
-                      aria-label="Yukarı taşı"
-                      disabled={index === 0 || isReordering}
-                      onClick={() => void moveStudent(index, -1)}
+                      disabled={isSaving}
+                      onClick={() => void handleSave()}
                     >
-                      <ChevronUp size={14} />
-                    </OrderButton>
-                    <OrderButton
-                      type="button"
-                      aria-label="Aşağı taşı"
-                      disabled={index === students.length - 1 || isReordering}
-                      onClick={() => void moveStudent(index, 1)}
-                    >
-                      <ChevronDown size={14} />
-                    </OrderButton>
-                  </OrderControls>
-                </StudentRow>
-              ))}
-              {students.length === 0 && !isPageLoading ? (
-                <AppSubtitle>Henüz öğrenci yok.</AppSubtitle>
-              ) : null}
-            </StudentList>
-          </AdminCard>
-
-          <AdminCard>
-            <AppCardTitle>
-              {selected ? selected.name : 'Öğrenci seç'}
-            </AppCardTitle>
-            {selected ? (
-              <FieldsStack>
-                <div>
-                  <FieldLabel htmlFor="showcase-highlight">Öne çıkan başarı metni</FieldLabel>
-                  <HighlightTextarea
-                    id="showcase-highlight"
-                    style={{ marginTop: 8 }}
-                    placeholder="Örn. TYT 24 netten 52 nete çıkardı"
-                    value={draft}
-                    onChange={(event) => {
-                      setDraft(event.target.value);
-                      setSavedMessage('');
-                    }}
-                  />
-                </div>
-                <Hint>
-                  Örnekler: “6+ saat çalışma”, “AYT Mat 0 → 16”, “22 gündür aktif”
-                </Hint>
-                <SaveRow>
-                  <SaveButton type="button" disabled={isSaving} onClick={() => void handleSave()}>
-                    {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
-                  </SaveButton>
-                  {savedMessage ? <SuccessText>{savedMessage}</SuccessText> : null}
-                </SaveRow>
-              </FieldsStack>
-            ) : (
-              <AppSubtitle>Düzenlemek için soldan bir öğrenci seç.</AppSubtitle>
-            )}
-          </AdminCard>
-        </EditorGrid>
-      </AdminContent>
-    </AdminShell>
+                      {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
+                    </AccentButton>
+                    {savedMessage ? <SuccessText>{savedMessage}</SuccessText> : null}
+                  </SaveRow>
+                </FieldsStack>
+              ) : (
+                <ContentSub>Düzenlemek için soldan bir öğrenci seç.</ContentSub>
+              )}
+            </ContentCard>
+          </EditorGrid>
+        </PreviewFrame>
+      </PreviewBody>
+    </PreviewShell>
   );
 }

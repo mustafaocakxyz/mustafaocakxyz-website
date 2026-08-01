@@ -198,6 +198,137 @@ export async function setTaskCompleted(taskId: string, completed: boolean) {
   if (error) throw error;
 }
 
+export type DailyTaskChange = {
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  studentId: string;
+  dateKey: string;
+  sortOrder: number;
+  task: StudentTask | null;
+  taskId: string;
+};
+
+function mapTaskChangeFromRow(
+  eventType: DailyTaskChange['eventType'],
+  row: Partial<DbDailyTask> & { id?: string },
+): DailyTaskChange | null {
+  if (!row.id) return null;
+  const taskId = row.id;
+  const studentId = row.student_id ?? '';
+  const dateKey = row.task_date ?? '';
+  const sortOrder = typeof row.sort_order === 'number' ? row.sort_order : 0;
+
+  if (eventType === 'DELETE') {
+    return {
+      eventType,
+      studentId,
+      dateKey,
+      sortOrder,
+      task: null,
+      taskId,
+    };
+  }
+
+  if (!row.student_id || !row.task_date || typeof row.label !== 'string') return null;
+
+  return {
+    eventType,
+    studentId: row.student_id,
+    dateKey: row.task_date,
+    sortOrder,
+    task: mapTask(row as DbDailyTask),
+    taskId,
+  };
+}
+
+/** Patch a student week map from a Realtime task change. */
+export function applyDailyTaskChange(
+  current: Record<string, StudentTask[]>,
+  change: DailyTaskChange,
+  fromDate?: string,
+  toDate?: string,
+): Record<string, StudentTask[]> {
+  const inRange = (dateKey: string) => {
+    if (!dateKey) return true;
+    if (fromDate && dateKey < fromDate) return false;
+    if (toDate && dateKey > toDate) return false;
+    return true;
+  };
+
+  if (change.eventType === 'DELETE') {
+    const next: Record<string, StudentTask[]> = {};
+    for (const [dateKey, tasks] of Object.entries(current)) {
+      next[dateKey] = tasks.filter((task) => task.id !== change.taskId);
+    }
+    return next;
+  }
+
+  if (!change.task || !inRange(change.dateKey)) {
+    if (change.eventType === 'UPDATE') {
+      const next: Record<string, StudentTask[]> = {};
+      for (const [dateKey, tasks] of Object.entries(current)) {
+        next[dateKey] = tasks.filter((task) => task.id !== change.taskId);
+      }
+      return next;
+    }
+    return current;
+  }
+
+  const next: Record<string, StudentTask[]> = {};
+  for (const [dateKey, tasks] of Object.entries(current)) {
+    next[dateKey] = tasks.filter((task) => task.id !== change.taskId);
+  }
+
+  const dayTasks = [...(next[change.dateKey] ?? []), change.task];
+  const withOrder = dayTasks.map((task, index) => ({
+    task,
+    order: task.id === change.taskId ? change.sortOrder : index,
+  }));
+  withOrder.sort((a, b) => a.order - b.order || a.task.label.localeCompare(b.task.label, 'tr'));
+  next[change.dateKey] = withOrder.map((entry) => entry.task);
+  return next;
+}
+
+/** Subscribe to daily_tasks changes. Filter by student or organization. Returns unsubscribe. */
+export function subscribeDailyTasks(
+  filter: { studentId: string } | { organizationId: string },
+  onChange: (change: DailyTaskChange) => void,
+): () => void {
+  const channelName =
+    'studentId' in filter
+      ? `daily-tasks:student:${filter.studentId}`
+      : `daily-tasks:org:${filter.organizationId}`;
+  const postgresFilter =
+    'studentId' in filter
+      ? `student_id=eq.${filter.studentId}`
+      : `organization_id=eq.${filter.organizationId}`;
+
+  const channel = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'daily_tasks',
+        filter: postgresFilter,
+      },
+      (payload) => {
+        const eventType = payload.eventType as DailyTaskChange['eventType'];
+        const row =
+          eventType === 'DELETE'
+            ? (payload.old as Partial<DbDailyTask>)
+            : (payload.new as Partial<DbDailyTask>);
+        const change = mapTaskChangeFromRow(eventType, row);
+        if (change) onChange(change);
+      },
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
 export async function fetchAdminNotesForRange(
   studentId: string,
   fromDate: string,
