@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppAuthProvider } from './AppAuthContext';
+import { AdminChatPage } from './pages/AdminChatPage';
 import { AdminPreviewPage } from './pages/AdminPreviewPage';
 import { AdminShowcasePage } from './pages/AdminShowcasePage';
 import { AppLoginPage } from './pages/AppLoginPage';
@@ -14,6 +15,7 @@ export function AppRoutes() {
         <Route path="admin" element={<AdminPreviewPage />} />
         <Route path="admin/preview" element={<Navigate to="/app/admin" replace />} />
         <Route path="admin/showcase" element={<AdminShowcasePage />} />
+        <Route path="admin/chat" element={<AdminChatPage />} />
         <Route path="*" element={<Navigate to="/app" replace />} />
       </Routes>
     </AppAuthProvider>

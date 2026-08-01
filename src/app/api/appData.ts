@@ -1,5 +1,7 @@
 import {
   supabase,
+  type DbChatMessage,
+  type DbChatThread,
   type DbDailyAdminNote,
   type DbDailySubmission,
   type DbDailyTask,
@@ -8,6 +10,8 @@ import {
 } from '../../lib/supabase';
 import {
   emptyDailySubmission,
+  type ChatMessage,
+  type ChatThread,
   type DailySubmission,
   type StudentMeeting,
   type StudentSummary,
@@ -15,6 +19,10 @@ import {
 } from '../types';
 import { isMeetingInFuture, normalizeMeetingLink } from '../utils/dates';
 import { parseTaskLabel } from '../utils/taskLabel';
+import {
+  getOrCreateChatSignedUrl,
+  prefetchChatSignedUrls,
+} from '../utils/chatSignedUrlCache';
 
 function mapTask(row: DbDailyTask): StudentTask {
   const storedDuration = (row.duration_label ?? '').trim();
@@ -685,4 +693,175 @@ export function getSubmissionForDate(
   dateKey: string,
 ): DailySubmission {
   return submissionsByDate[dateKey] ?? emptyDailySubmission();
+}
+
+function mapChatThread(row: DbChatThread): ChatThread {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    organizationId: row.organization_id,
+    lastMessageAt: row.last_message_at,
+  };
+}
+
+function mapChatMessage(row: DbChatMessage): ChatMessage {
+  return {
+    id: row.id,
+    threadId: row.thread_id,
+    senderId: row.sender_id,
+    body: row.body ?? '',
+    messageType: row.message_type,
+    attachmentPath: row.attachment_path,
+    createdAt: row.created_at,
+  };
+}
+
+export async function ensureChatThread(studentId: string): Promise<ChatThread> {
+  const { data, error } = await supabase.rpc('ensure_chat_thread', {
+    p_student_id: studentId,
+  });
+  if (error) throw error;
+  return mapChatThread(data as DbChatThread);
+}
+
+export async function fetchChatMessages(threadId: string): Promise<ChatMessage[]> {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select(
+      'id, organization_id, thread_id, sender_id, body, message_type, attachment_path, created_at',
+    )
+    .eq('thread_id', threadId)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => mapChatMessage(row as DbChatMessage));
+}
+
+export async function sendChatTextMessage(
+  threadId: string,
+  senderId: string,
+  body: string,
+): Promise<ChatMessage> {
+  const trimmed = body.trim();
+  if (!trimmed) throw new Error('Empty message');
+
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .insert({
+      thread_id: threadId,
+      sender_id: senderId,
+      body: trimmed,
+      message_type: 'text',
+    })
+    .select(
+      'id, organization_id, thread_id, sender_id, body, message_type, attachment_path, created_at',
+    )
+    .single();
+
+  if (error) throw error;
+  return mapChatMessage(data as DbChatMessage);
+}
+
+const CHAT_ATTACHMENTS_BUCKET = 'chat-attachments';
+
+export function sanitizeChatFileName(name: string): string {
+  const cleaned = name.replace(/[^\w.\-()+ ]+/g, '_').trim();
+  return cleaned.slice(0, 120) || 'file';
+}
+
+export function chatAttachmentFileName(path: string | null | undefined): string {
+  if (!path) return 'dosya';
+  const parts = path.split('/');
+  return parts[parts.length - 1] || 'dosya';
+}
+
+export async function createChatAttachmentSignedUrl(path: string): Promise<string> {
+  return getOrCreateChatSignedUrl(path, async () => {
+    const { data, error } = await supabase.storage
+      .from(CHAT_ATTACHMENTS_BUCKET)
+      .createSignedUrl(path, 60 * 60);
+    if (error) throw error;
+    return data.signedUrl;
+  });
+}
+
+export async function prefetchChatAttachmentUrls(
+  paths: Array<string | null | undefined>,
+): Promise<void> {
+  await prefetchChatSignedUrls(paths, async (path) => {
+    const { data, error } = await supabase.storage
+      .from(CHAT_ATTACHMENTS_BUCKET)
+      .createSignedUrl(path, 60 * 60);
+    if (error) throw error;
+    return data.signedUrl;
+  });
+}
+
+export async function sendChatAttachmentMessage(input: {
+  threadId: string;
+  senderId: string;
+  messageType: 'image' | 'document' | 'voice';
+  fileName: string;
+  contentType: string;
+  data: Blob | ArrayBuffer | File;
+  caption?: string;
+}): Promise<ChatMessage> {
+  const messageId = crypto.randomUUID();
+  const safeName = sanitizeChatFileName(input.fileName);
+  const attachmentPath = `${input.threadId}/${messageId}/${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(CHAT_ATTACHMENTS_BUCKET)
+    .upload(attachmentPath, input.data, {
+      contentType: input.contentType,
+      upsert: false,
+    });
+  if (uploadError) throw uploadError;
+
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .insert({
+      id: messageId,
+      thread_id: input.threadId,
+      sender_id: input.senderId,
+      body: (input.caption ?? '').trim(),
+      message_type: input.messageType,
+      attachment_path: attachmentPath,
+    })
+    .select(
+      'id, organization_id, thread_id, sender_id, body, message_type, attachment_path, created_at',
+    )
+    .single();
+
+  if (error) {
+    void supabase.storage.from(CHAT_ATTACHMENTS_BUCKET).remove([attachmentPath]);
+    throw error;
+  }
+
+  return mapChatMessage(data as DbChatMessage);
+}
+
+export function subscribeChatMessages(
+  threadId: string,
+  onInsert: (message: ChatMessage) => void,
+): () => void {
+  const channel = supabase
+    .channel(`chat-messages:${threadId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_messages',
+        filter: `thread_id=eq.${threadId}`,
+      },
+      (payload) => {
+        onInsert(mapChatMessage(payload.new as DbChatMessage));
+      },
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
 }

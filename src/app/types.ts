@@ -38,6 +38,25 @@ export type StudentMeeting = {
   meetingLink: string;
 };
 
+export type ChatMessageType = 'text' | 'image' | 'document' | 'voice' | 'system';
+
+export type ChatThread = {
+  id: string;
+  studentId: string;
+  organizationId: string;
+  lastMessageAt: string | null;
+};
+
+export type ChatMessage = {
+  id: string;
+  threadId: string;
+  senderId: string | null;
+  body: string;
+  messageType: ChatMessageType;
+  attachmentPath: string | null;
+  createdAt: string;
+};
+
 export const emptyDailySubmission = (): DailySubmission => ({
   uyumaSaati: null,
   uyanmaSaati: null,

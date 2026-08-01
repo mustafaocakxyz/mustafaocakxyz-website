@@ -84,6 +84,7 @@ import {
   StatusChip,
   StudentCardButton,
   StudentName,
+  ChatGlowButton,
   TopBarActions,
   TopBarButton,
   TopBarEnd,
@@ -794,6 +795,9 @@ export function AdminPreviewPage() {
       <PreviewTopBar>
         <TopBarTitle>Admin Paneli</TopBarTitle>
         <TopBarActions>
+          <ChatGlowButton as={Link} to="/app/admin/chat">
+            Sohbet
+          </ChatGlowButton>
           <TopBarButton as={Link} to="/app/admin/showcase">
             Vitrin Düzenle
           </TopBarButton>

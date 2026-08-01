@@ -57,3 +57,23 @@ export type DbStudentMeeting = {
   meeting_time: string;
   meeting_link: string;
 };
+
+export type DbChatThread = {
+  id: string;
+  organization_id: string;
+  student_id: string;
+  last_message_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DbChatMessage = {
+  id: string;
+  organization_id: string;
+  thread_id: string;
+  sender_id: string | null;
+  body: string;
+  message_type: 'text' | 'image' | 'document' | 'voice' | 'system';
+  attachment_path: string | null;
+  created_at: string;
+};

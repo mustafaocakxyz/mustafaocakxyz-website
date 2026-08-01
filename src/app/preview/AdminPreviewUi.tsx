@@ -79,6 +79,41 @@ export const TopBarButton = styled.button`
   }
 `;
 
+/** Glowing orange CTA for admin chat entry in the top bar. */
+export const ChatGlowButton = styled(TopBarButton)`
+  border-color: rgba(251, 146, 60, 0.75);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: #fff7ed;
+  font-weight: 800;
+  box-shadow:
+    0 0 0 1px rgba(251, 146, 60, 0.35),
+    0 0 14px rgba(249, 115, 22, 0.55),
+    0 0 28px rgba(234, 88, 12, 0.35);
+  animation: chatGlowPulse 2.2s ease-in-out infinite;
+
+  @keyframes chatGlowPulse {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 1px rgba(251, 146, 60, 0.35),
+        0 0 12px rgba(249, 115, 22, 0.5),
+        0 0 24px rgba(234, 88, 12, 0.3);
+    }
+    50% {
+      box-shadow:
+        0 0 0 1px rgba(251, 146, 60, 0.55),
+        0 0 18px rgba(249, 115, 22, 0.75),
+        0 0 36px rgba(234, 88, 12, 0.45);
+    }
+  }
+
+  &:hover {
+    border-color: rgba(253, 186, 116, 0.9);
+    color: #ffffff;
+    filter: brightness(1.06);
+  }
+`;
+
 export const TopBarEnd = styled.div`
   justify-self: end;
   display: flex;
