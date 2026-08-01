@@ -798,6 +798,8 @@ export function AdminPreviewPage() {
           <ChatGlowButton as={Link} to="/app/admin/chat">
             Sohbet
           </ChatGlowButton>
+        </TopBarActions>
+        <TopBarEnd>
           <TopBarButton as={Link} to="/app/admin/showcase">
             Vitrin Düzenle
           </TopBarButton>
@@ -816,8 +818,6 @@ export function AdminPreviewPage() {
           >
             Çıkış Yap
           </TopBarButton>
-        </TopBarActions>
-        <TopBarEnd>
           <EarningsBadge title="Aylık kazanç = (aktif öğrenci − 2) × 5000">
             <LiveDotWrap aria-hidden>
               <LiveDotPulse />

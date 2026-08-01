@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
   applyDailyTaskChange,
@@ -19,6 +19,7 @@ import { SubmissionForm } from '../components/SubmissionForm';
 import { TaskList } from '../components/TaskList';
 import { preview as t } from '../preview/adminPreviewTheme';
 import {
+  ChatGlowButton,
   ContentCard,
   ContentTitle,
   ErrorText,
@@ -61,13 +62,17 @@ const StudentTopBar = styled.header`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   min-height: 52px;
   padding: 10px 20px;
   border-bottom: 1px solid ${t.border};
   background: ${t.panel};
 
   @media (min-width: 640px) {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 12px;
     padding: 10px 28px;
   }
 `;
@@ -82,6 +87,7 @@ const StudentTopTitle = styled.h1`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  justify-self: start;
 `;
 
 const LogoutButton = styled.button`
@@ -95,11 +101,19 @@ const LogoutButton = styled.button`
   font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
+  justify-self: end;
 
   &:hover {
     border-color: rgba(96, 165, 250, 0.5);
     color: ${t.text};
   }
+`;
+
+const StudentChatButton = styled(ChatGlowButton)`
+  padding: 7px 12px;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+  justify-self: center;
 `;
 
 const StudentBody = styled.div`
@@ -342,6 +356,9 @@ export function StudentDashboardPage() {
     <PreviewShell>
       <StudentTopBar>
         <StudentTopTitle>{user.displayName}</StudentTopTitle>
+        <StudentChatButton as={Link} to="/app/student/chat">
+          Sohbet
+        </StudentChatButton>
         <LogoutButton
           type="button"
           onClick={() => {
