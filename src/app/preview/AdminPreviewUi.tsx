@@ -674,6 +674,18 @@ export const DaySliderRow = styled.div`
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 8px;
+
+  @media (max-width: 560px) {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 2px;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
 `;
 
 export const DayPill = styled.button<{ $selected: boolean; $isToday: boolean }>`
@@ -691,6 +703,13 @@ export const DayPill = styled.button<{ $selected: boolean; $isToday: boolean }>`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+
+  @media (max-width: 560px) {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 76px;
+    padding: 10px 12px;
+  }
 
   ${({ $isToday, $selected }) =>
     $isToday &&

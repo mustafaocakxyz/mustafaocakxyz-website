@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Trash2, Video } from 'lucide-react';
 import styled from 'styled-components';
-import { getFormAccent } from '../../styles/formTheme';
 import { HOUR_TIME_OPTIONS, MINUTE_TIME_OPTIONS, type StudentMeeting } from '../types';
 import {
   buildUpcomingDays,
@@ -10,9 +9,8 @@ import {
   normalizeMeetingLink,
   toDateKey,
 } from '../utils/dates';
-import { PrimaryButton } from './AppUi';
-
-const accent = getFormAccent('blue');
+import { preview as t } from '../preview/adminPreviewTheme';
+import { AccentButton } from '../preview/AdminPreviewUi';
 
 type MeetingPanelProps = {
   meeting: StudentMeeting | null;
@@ -43,14 +41,14 @@ const MetaText = styled.p`
   margin: 0;
   font-size: 0.95rem;
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.88);
+  color: ${t.text};
 `;
 
 const CompactMeta = styled.p`
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.4;
-  color: rgba(255, 255, 255, 0.82);
+  color: ${t.muted};
 `;
 
 const ActionsRow = styled.div`
@@ -67,39 +65,50 @@ const JoinLink = styled.a`
   gap: 8px;
   padding: 12px 18px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 138, 101, 0.45);
-  background: rgba(230, 74, 25, 0.22);
-  color: rgba(255, 204, 188, 0.98);
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  background: rgba(59, 130, 246, 0.16);
+  color: rgba(191, 219, 254, 0.98);
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 700;
   font-family: inherit;
   text-decoration: none;
 
   &:hover {
-    border-color: rgba(255, 171, 145, 0.65);
-    background: rgba(230, 74, 25, 0.32);
+    border-color: rgba(96, 165, 250, 0.65);
+    background: rgba(59, 130, 246, 0.24);
   }
 `;
 
-const IconButton = styled.button<{ $danger?: boolean }>`
+const IconButton = styled.button<{ $danger?: boolean; $primary?: boolean }>`
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   padding: 10px 14px;
-  border-radius: 999px;
+  border-radius: ${t.radiusSm};
   border: 1px solid
-    ${({ $danger }) =>
-      $danger ? 'rgba(255, 138, 128, 0.35)' : 'rgba(66, 165, 245, 0.3)'};
-  background: rgba(255, 255, 255, 0.05);
-  color: ${({ $danger }) => ($danger ? '#ff8a80' : 'rgba(144, 202, 249, 0.95)')};
+    ${({ $danger, $primary }) =>
+      $danger
+        ? 'rgba(248, 113, 113, 0.35)'
+        : $primary
+          ? 'rgba(96, 165, 250, 0.5)'
+          : t.borderStrong};
+  background: ${({ $danger, $primary }) =>
+    $danger
+      ? t.dangerSoft
+      : $primary
+        ? 'rgba(59, 130, 246, 0.16)'
+        : t.panel2};
+  color: ${({ $danger, $primary }) =>
+    $danger ? t.danger : $primary ? 'rgba(191, 219, 254, 0.98)' : t.muted};
   font-size: 0.85rem;
-  font-weight: 500;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.09);
+    color: ${t.text};
+    border-color: rgba(96, 165, 250, 0.5);
   }
 
   &:disabled {
@@ -108,9 +117,9 @@ const IconButton = styled.button<{ $danger?: boolean }>`
   }
 `;
 
-const PlanButton = styled(PrimaryButton)`
-  width: auto;
-  align-self: stretch;
+const PlanButton = styled(AccentButton)`
+  width: 100%;
+  justify-content: center;
   padding: 14px 18px;
 `;
 
@@ -121,25 +130,28 @@ const FieldGroup = styled.div`
 `;
 
 const FieldLabel = styled.label`
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: ${t.muted};
 `;
 
 const fieldStyles = `
   width: 100%;
+  box-sizing: border-box;
   padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid ${accent.inputBorder};
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.95);
+  border-radius: ${t.radiusSm};
+  border: 1px solid ${t.border};
+  background: ${t.panel2};
+  color: ${t.text};
   font-size: 0.92rem;
   font-family: inherit;
   outline: none;
 
   &:focus {
-    border-color: ${accent.inputBorderFocus};
-    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(96, 165, 250, 0.55);
+    background: rgba(30, 41, 59, 0.92);
   }
 `;
 
@@ -149,8 +161,8 @@ const FieldSelect = styled.select`
   color-scheme: dark;
 
   option {
-    background: #0d2137;
-    color: rgba(255, 255, 255, 0.95);
+    background: ${t.panel};
+    color: ${t.text};
   }
 `;
 
@@ -158,7 +170,7 @@ const FieldInput = styled.input`
   ${fieldStyles}
 
   &::placeholder {
-    color: rgba(255, 255, 255, 0.3);
+    color: ${t.mutedSoft};
   }
 `;
 
@@ -170,13 +182,13 @@ const TimeRow = styled.div`
 `;
 
 const TimeSep = styled.span`
-  color: rgba(255, 255, 255, 0.55);
+  color: ${t.muted};
   font-weight: 600;
 `;
 
 const StatusText = styled.span<{ $error?: boolean }>`
   font-size: 0.85rem;
-  color: ${({ $error }) => ($error ? '#ff8a80' : 'rgba(165, 214, 167, 0.95)')};
+  color: ${({ $error }) => ($error ? t.danger : t.success)};
 `;
 
 function splitTime(value: string): { hour: string; minute: string } {

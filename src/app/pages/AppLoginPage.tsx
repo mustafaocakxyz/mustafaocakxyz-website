@@ -1,69 +1,92 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { getFormAccent } from '../../styles/formTheme';
 import { useAppAuth } from '../AppAuthContext';
-import { AppCard, AppContent, AppShell, AppSubtitle, BlueTitle } from '../components/AppShell';
-import { PrimaryButton } from '../components/AppUi';
+import { preview as t } from '../preview/adminPreviewTheme';
+import {
+  AccentButton,
+  ContentCard,
+  ContentSub,
+  ContentTitle,
+  LoadingText,
+  PreviewShell,
+} from '../preview/AdminPreviewUi';
 
-const accent = getFormAccent('blue');
-
-const LoginCard = styled(AppCard)`
-  max-width: 420px;
+const LoginBody = styled.div`
+  flex: 1;
   width: 100%;
-  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px 48px;
+  box-sizing: border-box;
+`;
+
+const LoginCard = styled(ContentCard)`
+  width: 100%;
+  max-width: 420px;
+`;
+
+const Intro = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
 `;
 
 const FieldsStack = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 `;
 
 const FieldGroup = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 `;
 
 const FieldLabel = styled.label`
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: ${t.muted};
 `;
 
 const FieldInput = styled.input`
   width: 100%;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid ${accent.inputBorder};
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.95);
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: ${t.radiusSm};
+  border: 1px solid ${t.border};
+  background: ${t.panel2};
+  color: ${t.text};
   font-size: 0.95rem;
   font-family: inherit;
   outline: none;
-  transition: border-color 0.2s ease, background 0.2s ease;
 
   &:focus {
-    border-color: ${accent.inputBorderFocus};
-    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(96, 165, 250, 0.55);
+    background: rgba(30, 41, 59, 0.92);
   }
 
   &::placeholder {
-    color: rgba(255, 255, 255, 0.3);
+    color: ${t.mutedSoft};
   }
 `;
 
 const ErrorMessage = styled.p`
   margin: 0;
   font-size: 0.88rem;
-  color: #ff8a80;
+  color: ${t.danger};
 `;
 
-const LoadingText = styled.p`
-  margin: 0;
-  color: rgba(255, 255, 255, 0.55);
-  text-align: center;
+const SubmitButton = styled(AccentButton)`
+  width: 100%;
+  justify-content: center;
+  padding: 14px 18px;
+  margin-top: 4px;
 `;
 
 export function AppLoginPage() {
@@ -76,9 +99,11 @@ export function AppLoginPage() {
 
   if (isLoading) {
     return (
-      <AppShell>
-        <LoadingText>Yükleniyor...</LoadingText>
-      </AppShell>
+      <PreviewShell>
+        <LoginBody>
+          <LoadingText>Yükleniyor...</LoadingText>
+        </LoginBody>
+      </PreviewShell>
     );
   }
 
@@ -107,14 +132,14 @@ export function AppLoginPage() {
   };
 
   return (
-    <AppShell>
-      <AppContent>
-        <div>
-          <BlueTitle>Giriş</BlueTitle>
-          <AppSubtitle style={{ marginTop: 8 }}>Gelişim programı uygulaması</AppSubtitle>
-        </div>
-
+    <PreviewShell>
+      <LoginBody>
         <LoginCard as="form" onSubmit={handleSubmit}>
+          <Intro>
+            <ContentTitle>Giriş</ContentTitle>
+            <ContentSub>Gelişim programı uygulaması</ContentSub>
+          </Intro>
+
           <FieldsStack>
             <FieldGroup>
               <FieldLabel htmlFor="username">Kullanıcı adı</FieldLabel>
@@ -148,12 +173,12 @@ export function AppLoginPage() {
 
             {error ? <ErrorMessage>{error}</ErrorMessage> : null}
 
-            <PrimaryButton type="submit" disabled={isSubmitting}>
+            <SubmitButton type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Giriş yapılıyor...' : 'Giriş yap'}
-            </PrimaryButton>
+            </SubmitButton>
           </FieldsStack>
         </LoginCard>
-      </AppContent>
-    </AppShell>
+      </LoginBody>
+    </PreviewShell>
   );
 }

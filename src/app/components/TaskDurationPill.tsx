@@ -1,16 +1,17 @@
 import styled from 'styled-components';
+import { preview as t } from '../preview/adminPreviewTheme';
 
-/** Orange duration badge for daily tasks. */
+/** Duration badge for daily tasks. */
 export const TaskDurationPill = styled.span<{ $muted?: boolean }>`
   flex-shrink: 0;
-  padding: 4px 10px;
+  padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 138, 101, 0.5);
-  background: rgba(230, 74, 25, 0.22);
+  border: 1px solid ${t.border};
+  background: rgba(59, 130, 246, 0.12);
   color: ${({ $muted }) =>
-    $muted ? 'rgba(255, 204, 188, 0.55)' : 'rgba(255, 204, 188, 0.98)'};
-  font-size: 0.75rem;
-  font-weight: 600;
+    $muted ? 'rgba(191, 219, 254, 0.55)' : 'rgba(191, 219, 254, 0.95)'};
+  font-size: 0.72rem;
+  font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;
 `;

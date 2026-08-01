@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { getFormAccent } from '../../styles/formTheme';
-import { PrimaryButton } from './AppUi';
-
-const accent = getFormAccent('blue');
+import { preview as t } from '../preview/adminPreviewTheme';
+import { AccentButton } from '../preview/AdminPreviewUi';
 
 type DayAdminNoteProps = {
   value: string;
@@ -19,25 +17,33 @@ const Stack = styled.div`
 
 const NoteTextarea = styled.textarea`
   width: 100%;
+  box-sizing: border-box;
   min-height: 110px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid ${accent.inputBorder};
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.95);
+  padding: 12px 14px;
+  border-radius: ${t.radiusSm};
+  border: 1px solid ${t.border};
+  background: ${t.panel2};
+  color: ${t.text};
   font-size: 0.95rem;
   font-family: inherit;
   line-height: 1.5;
   resize: vertical;
   outline: none;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 
   &:focus {
-    border-color: ${accent.inputBorderFocus};
-    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(96, 165, 250, 0.55);
+    background: rgba(30, 41, 59, 0.92);
   }
 
   &::placeholder {
-    color: rgba(255, 255, 255, 0.3);
+    color: ${t.mutedSoft};
   }
 
   &:disabled {
@@ -49,11 +55,11 @@ const NoteTextarea = styled.textarea`
 
 const ReadNote = styled.p`
   margin: 0;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid rgba(66, 165, 245, 0.2);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.88);
+  padding: 12px 14px;
+  border-radius: ${t.radiusSm};
+  border: 1px solid ${t.border};
+  background: ${t.panel2};
+  color: ${t.text};
   font-size: 0.95rem;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -62,8 +68,8 @@ const ReadNote = styled.p`
 const EmptyState = styled.p`
   margin: 0;
   padding: 8px 4px 4px;
-  font-size: 0.92rem;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.9rem;
+  color: ${t.muted};
 `;
 
 const SaveRow = styled.div`
@@ -72,21 +78,9 @@ const SaveRow = styled.div`
   gap: 12px;
 `;
 
-const SaveButton = styled(PrimaryButton)`
-  width: auto;
-  min-width: 120px;
-  padding: 12px 22px;
-
-  &:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-    transform: none;
-  }
-`;
-
 const StatusText = styled.span<{ $error?: boolean }>`
   font-size: 0.85rem;
-  color: ${({ $error }) => ($error ? '#ff8a80' : 'rgba(165, 214, 167, 0.95)')};
+  color: ${({ $error }) => ($error ? t.danger : t.success)};
 `;
 
 export function DayAdminNote({ value, readOnly = false, onSave }: DayAdminNoteProps) {
@@ -133,9 +127,9 @@ export function DayAdminNote({ value, readOnly = false, onSave }: DayAdminNotePr
         }}
       />
       <SaveRow>
-        <SaveButton type="button" disabled={isSaving} onClick={() => void handleSave()}>
+        <AccentButton type="button" disabled={isSaving} onClick={() => void handleSave()}>
           {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
-        </SaveButton>
+        </AccentButton>
         {status ? <StatusText $error={status.error}>{status.text}</StatusText> : null}
       </SaveRow>
     </Stack>

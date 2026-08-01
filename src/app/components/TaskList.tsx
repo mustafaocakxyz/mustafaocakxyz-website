@@ -1,6 +1,7 @@
 import styled from 'styled-components';
 import { Check } from 'lucide-react';
 import type { StudentTask } from '../types';
+import { preview as t } from '../preview/adminPreviewTheme';
 import { TaskDurationPill } from './TaskDurationPill';
 
 type TaskListProps = {
@@ -12,26 +13,27 @@ type TaskListProps = {
 const TaskStack = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 `;
 
 const TaskRow = styled.label<{ $completed: boolean; $readOnly?: boolean }>`
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid rgba(66, 165, 245, 0.2);
-  background: rgba(255, 255, 255, 0.04);
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: ${t.radiusMd};
+  border: 1px solid ${t.border};
+  background: ${t.panel2};
   cursor: ${({ $readOnly }) => ($readOnly ? 'default' : 'pointer')};
-  transition: border-color 0.2s ease, background 0.2s ease;
+  opacity: ${({ $completed }) => ($completed ? 0.72 : 1)};
+  transition: border-color 0.15s ease, background 0.15s ease;
 
   ${({ $readOnly }) =>
     !$readOnly &&
     `
     &:hover {
-      border-color: rgba(66, 165, 245, 0.4);
-      background: rgba(255, 255, 255, 0.06);
+      border-color: ${t.borderStrong};
+      background: rgba(30, 41, 59, 0.92);
     }
   `}
 `;
@@ -47,33 +49,31 @@ const CheckboxVisual = styled.span<{ $checked: boolean }>`
   width: 22px;
   height: 22px;
   flex-shrink: 0;
-  border-radius: 7px;
+  border-radius: 8px;
   border: 1px solid
-    ${({ $checked }) => ($checked ? 'rgba(66, 165, 245, 0.8)' : 'rgba(66, 165, 245, 0.35)')};
+    ${({ $checked }) => ($checked ? 'rgba(96, 165, 250, 0.7)' : t.borderStrong)};
   background: ${({ $checked }) =>
-    $checked ? 'rgba(33, 150, 243, 0.35)' : 'rgba(255, 255, 255, 0.04)'};
+    $checked ? 'rgba(59, 130, 246, 0.28)' : 'rgba(15, 23, 42, 0.5)'};
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  color: ${t.text};
 `;
 
 const TaskLabel = styled.span<{ $completed: boolean }>`
   flex: 1;
   min-width: 0;
-  font-size: 0.95rem;
+  font-size: 0.94rem;
   line-height: 1.4;
-  color: ${({ $completed }) =>
-    $completed ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.9)'};
+  color: ${({ $completed }) => ($completed ? t.mutedSoft : t.text)};
   text-decoration: ${({ $completed }) => ($completed ? 'line-through' : 'none')};
 `;
 
 const EmptyState = styled.p`
   margin: 0;
   padding: 12px 4px;
-  font-size: 0.92rem;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.9rem;
+  color: ${t.muted};
 `;
 
 export function TaskList({ tasks, onToggle, readOnly = false }: TaskListProps) {
