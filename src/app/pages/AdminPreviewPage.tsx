@@ -1,19 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Video } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
+import styled, { keyframes } from 'styled-components';
 import {
   applyDailyTaskChange,
   createTask,
   deleteMeeting,
   deleteTask,
   exportOrganizationJson,
-  fetchAdminNotesForRange,
-  fetchMeetingsForRange,
+  fetchOrgAdminNotesForRange,
+  fetchOrgMeetingsForRange,
+  fetchOrgSubmissionsForRange,
   fetchOrgTasksForDates,
+  fetchOrgTasksForRange,
   fetchStudentIdsWithMeetingsInRange,
   fetchStudents,
   fetchSubmissionsForRange,
   fetchTasksForRange,
+  fetchAdminNotesForRange,
+  fetchMeetingsForRange,
   getSubmissionForDate,
   subscribeDailyTasks,
   updateTaskLabel,
@@ -84,6 +89,7 @@ import {
   TopBarEnd,
   TopBarTitle,
 } from '../preview/AdminPreviewUi';
+import { preview as t } from '../preview/adminPreviewTheme';
 
 const TODAY_INDEX = 1;
 
@@ -109,7 +115,7 @@ const PROFILE_SECTIONS: { id: Extract<SectionId, 'topics' | 'exams' | 'notes'>; 
 ];
 
 const PRICE_PER_STUDENT = 5000;
-const FREE_TRIAL_OFFSET = 1;
+const FREE_TRIAL_OFFSET = 2;
 
 function formatMonthlyEarnings(activeStudentCount: number): string {
   const paying = Math.max(0, activeStudentCount - FREE_TRIAL_OFFSET);
@@ -178,6 +184,92 @@ function avatarTone(id: string): string {
   return AVATAR_TONES[hash % AVATAR_TONES.length];
 }
 
+type StudentWeekSnapshot = {
+  tasksByDate: Record<string, StudentTask[]>;
+  submissionsByDate: Record<string, DailySubmission>;
+  adminNotesByDate: Record<string, string>;
+  meetingsByDate: Record<string, StudentMeeting>;
+};
+
+function weekCacheKey(studentId: string, weekFrom: string, weekTo: string): string {
+  return `${studentId}|${weekFrom}|${weekTo}`;
+}
+
+function emptyWeekSnapshot(): StudentWeekSnapshot {
+  return {
+    tasksByDate: {},
+    submissionsByDate: {},
+    adminNotesByDate: {},
+    meetingsByDate: {},
+  };
+}
+
+const bootSpin = keyframes`
+  to {
+    transform: rotate(360deg);
+  }
+`;
+
+const BootScreen = styled.div`
+  flex: 1;
+  width: 100%;
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 32px 20px;
+  box-sizing: border-box;
+`;
+
+const BootSpinner = styled.div`
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 3px solid rgba(148, 163, 184, 0.22);
+  border-top-color: rgba(96, 165, 250, 0.95);
+  animation: ${bootSpin} 0.75s linear infinite;
+`;
+
+const BootTitle = styled.h1`
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: ${t.text};
+`;
+
+const BootSub = styled.p`
+  margin: 0;
+  font-size: 0.9rem;
+  color: ${t.muted};
+  text-align: center;
+`;
+
+const BootTrack = styled.div`
+  width: min(320px, 100%);
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid ${t.border};
+  overflow: hidden;
+`;
+
+const BootFill = styled.div<{ $pct: number }>`
+  height: 100%;
+  width: ${({ $pct }) => `${Math.max(0, Math.min(100, $pct))}%`};
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.85), rgba(96, 165, 250, 0.95));
+  transition: width 0.25s ease;
+`;
+
+const BootPercent = styled.span`
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: ${t.mutedSoft};
+`;
+
 export function AdminPreviewPage() {
   const { user, isLoading, logout } = useAppAuth();
   const weekDays = useMemo(() => buildWeekDays(), []);
@@ -185,6 +277,8 @@ export function AdminPreviewPage() {
   const weekTo = toDateKey(weekDays[weekDays.length - 1]);
   const { todayKey, tomorrowKey } = useMemo(() => getTodayAndTomorrowKeys(), []);
   const meetingAlertToKey = useMemo(() => addDaysToDateKey(todayKey, 2), [todayKey]);
+  const weekCacheRef = useRef<Map<string, StudentWeekSnapshot>>(new Map());
+  const skipRevalidateOnceRef = useRef(false);
 
   const [students, setStudents] = useState<StudentSummary[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -201,9 +295,58 @@ export function AdminPreviewPage() {
     () => new Set(),
   );
   const [studentStatuses, setStudentStatuses] = useState<Record<string, StudentStatus>>({});
-  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [bootProgress, setBootProgress] = useState(0);
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState('');
+
+  const applyWeekSnapshot = useCallback((snapshot: StudentWeekSnapshot) => {
+    setTasksByDate(snapshot.tasksByDate);
+    setSubmissionsByDate(snapshot.submissionsByDate);
+    setAdminNotesByDate(snapshot.adminNotesByDate);
+    setMeetingsByDate(snapshot.meetingsByDate);
+  }, []);
+
+  const writeWeekCache = useCallback(
+    (studentId: string, snapshot: StudentWeekSnapshot) => {
+      weekCacheRef.current.set(weekCacheKey(studentId, weekFrom, weekTo), snapshot);
+    },
+    [weekFrom, weekTo],
+  );
+
+  const patchWeekCacheTasks = useCallback(
+    (studentId: string, nextTasks: Record<string, StudentTask[]>) => {
+      const key = weekCacheKey(studentId, weekFrom, weekTo);
+      const cached = weekCacheRef.current.get(key);
+      if (cached) {
+        weekCacheRef.current.set(key, { ...cached, tasksByDate: nextTasks });
+      }
+    },
+    [weekFrom, weekTo],
+  );
+
+  const patchWeekCacheNotes = useCallback(
+    (studentId: string, nextNotes: Record<string, string>) => {
+      const key = weekCacheKey(studentId, weekFrom, weekTo);
+      const cached = weekCacheRef.current.get(key);
+      if (cached) {
+        weekCacheRef.current.set(key, { ...cached, adminNotesByDate: nextNotes });
+      }
+    },
+    [weekFrom, weekTo],
+  );
+
+  const patchWeekCacheMeetings = useCallback(
+    (studentId: string, nextMeetings: Record<string, StudentMeeting>) => {
+      const key = weekCacheKey(studentId, weekFrom, weekTo);
+      const cached = weekCacheRef.current.get(key);
+      if (cached) {
+        weekCacheRef.current.set(key, { ...cached, meetingsByDate: nextMeetings });
+      }
+    },
+    [weekFrom, weekTo],
+  );
 
   const refreshMeetingAlerts = useCallback(async () => {
     const ids = await fetchStudentIdsWithMeetingsInRange(todayKey, meetingAlertToKey);
@@ -236,57 +379,146 @@ export function AdminPreviewPage() {
   );
 
   useEffect(() => {
+    weekCacheRef.current.clear();
+  }, [weekFrom, weekTo]);
+
+  useEffect(() => {
     if (!user || user.role !== 'admin') return;
 
     let isMounted = true;
-    setIsPageLoading(true);
+    setIsBootstrapping(true);
+    setBootProgress(4);
     setError('');
+    weekCacheRef.current.clear();
 
-    const loadStudents = async () => {
+    const bump = (value: number) => {
+      if (isMounted) setBootProgress((current) => Math.max(current, value));
+    };
+
+    const bootstrap = async () => {
       try {
         const rows = await fetchStudents();
         if (!isMounted) return;
+        bump(18);
         setStudents(rows);
-        setSelectedStudentId((current) => current || rows[0]?.id || '');
-        await Promise.all([
-          refreshStudentStatuses(rows.map((row) => row.id)),
-          refreshMeetingAlerts(),
-        ]);
+
+        const studentIds = rows.map((row) => row.id);
+        const advancePerQuery = 16;
+        let completedQueries = 0;
+        const track = async <T,>(promise: Promise<T>): Promise<T> => {
+          const result = await promise;
+          completedQueries += 1;
+          bump(18 + completedQueries * advancePerQuery);
+          return result;
+        };
+
+        const [tasksByStudent, submissionsByStudent, notesByStudent, meetingsByStudent, meetingAlertIds] =
+          await Promise.all([
+            track(fetchOrgTasksForRange(weekFrom, weekTo)),
+            track(fetchOrgSubmissionsForRange(weekFrom, weekTo)),
+            track(fetchOrgAdminNotesForRange(weekFrom, weekTo)),
+            track(fetchOrgMeetingsForRange(weekFrom, weekTo)),
+            track(fetchStudentIdsWithMeetingsInRange(todayKey, meetingAlertToKey)),
+          ]);
+
+        if (!isMounted) return;
+        bump(92);
+
+        for (const student of rows) {
+          writeWeekCache(student.id, {
+            tasksByDate: tasksByStudent[student.id] ?? {},
+            submissionsByDate: submissionsByStudent[student.id] ?? {},
+            adminNotesByDate: notesByStudent[student.id] ?? {},
+            meetingsByDate: meetingsByStudent[student.id] ?? {},
+          });
+        }
+
+        setStudentStatuses(buildStatusMap(studentIds, tasksByStudent, todayKey, tomorrowKey));
+        setStudentsWithUpcomingMeeting(meetingAlertIds);
+
+        const firstId = rows[0]?.id ?? '';
+        if (firstId) {
+          const firstSnap =
+            weekCacheRef.current.get(weekCacheKey(firstId, weekFrom, weekTo)) ??
+            emptyWeekSnapshot();
+          applyWeekSnapshot(firstSnap);
+          skipRevalidateOnceRef.current = true;
+          setSelectedStudentId(firstId);
+        } else {
+          setSelectedStudentId('');
+        }
+
+        bump(100);
       } catch {
-        if (isMounted) setError('Öğrenci listesi yüklenemedi.');
+        if (isMounted) setError('Admin paneli yüklenemedi.');
       } finally {
-        if (isMounted) setIsPageLoading(false);
+        if (isMounted) {
+          setIsBootstrapping(false);
+          setIsPageLoading(false);
+        }
       }
     };
 
-    void loadStudents();
+    void bootstrap();
     return () => {
       isMounted = false;
     };
-  }, [user, refreshStudentStatuses, refreshMeetingAlerts]);
+  }, [
+    user,
+    weekFrom,
+    weekTo,
+    todayKey,
+    tomorrowKey,
+    meetingAlertToKey,
+    writeWeekCache,
+    applyWeekSnapshot,
+  ]);
 
   useEffect(() => {
-    if (!selectedStudentId) return;
+    if (isBootstrapping || !selectedStudentId) return;
 
     let isMounted = true;
-    setIsPageLoading(true);
+    const studentId = selectedStudentId;
+    const cacheKey = weekCacheKey(studentId, weekFrom, weekTo);
+    const cached = weekCacheRef.current.get(cacheKey);
+
     setError('');
     setSection('tasks');
+
+    if (cached) {
+      applyWeekSnapshot(cached);
+      syncSelectedStudentStatus(studentId, cached.tasksByDate);
+      setIsPageLoading(false);
+      if (skipRevalidateOnceRef.current) {
+        skipRevalidateOnceRef.current = false;
+        return;
+      }
+    } else {
+      setIsPageLoading(true);
+      setTasksByDate({});
+      setSubmissionsByDate({});
+      setAdminNotesByDate({});
+      setMeetingsByDate({});
+    }
 
     const loadStudentWeek = async () => {
       try {
         const [tasks, submissions, adminNotes, meetings] = await Promise.all([
-          fetchTasksForRange(selectedStudentId, weekFrom, weekTo),
-          fetchSubmissionsForRange(selectedStudentId, weekFrom, weekTo),
-          fetchAdminNotesForRange(selectedStudentId, weekFrom, weekTo),
-          fetchMeetingsForRange(selectedStudentId, weekFrom, weekTo),
+          fetchTasksForRange(studentId, weekFrom, weekTo),
+          fetchSubmissionsForRange(studentId, weekFrom, weekTo),
+          fetchAdminNotesForRange(studentId, weekFrom, weekTo),
+          fetchMeetingsForRange(studentId, weekFrom, weekTo),
         ]);
         if (!isMounted) return;
-        setTasksByDate(tasks);
-        setSubmissionsByDate(submissions);
-        setAdminNotesByDate(adminNotes);
-        setMeetingsByDate(meetings);
-        syncSelectedStudentStatus(selectedStudentId, tasks);
+        const snapshot: StudentWeekSnapshot = {
+          tasksByDate: tasks,
+          submissionsByDate: submissions,
+          adminNotesByDate: adminNotes,
+          meetingsByDate: meetings,
+        };
+        writeWeekCache(studentId, snapshot);
+        applyWeekSnapshot(snapshot);
+        syncSelectedStudentStatus(studentId, tasks);
       } catch {
         if (isMounted) setError('Öğrenci verileri yüklenemedi.');
       } finally {
@@ -298,7 +530,15 @@ export function AdminPreviewPage() {
     return () => {
       isMounted = false;
     };
-  }, [selectedStudentId, weekFrom, weekTo, syncSelectedStudentStatus]);
+  }, [
+    isBootstrapping,
+    selectedStudentId,
+    weekFrom,
+    weekTo,
+    syncSelectedStudentStatus,
+    applyWeekSnapshot,
+    writeWeekCache,
+  ]);
 
   useEffect(() => {
     if (!user || user.role !== 'admin' || !user.organizationId) return;
@@ -310,6 +550,7 @@ export function AdminPreviewPage() {
       if (selectedStudentId && change.studentId === selectedStudentId) {
         setTasksByDate((current) => {
           const next = applyDailyTaskChange(current, change, weekFrom, weekTo);
+          patchWeekCacheTasks(selectedStudentId, next);
           syncSelectedStudentStatus(selectedStudentId, next);
           return next;
         });
@@ -337,6 +578,7 @@ export function AdminPreviewPage() {
     tomorrowKey,
     syncSelectedStudentStatus,
     refreshStudentStatuses,
+    patchWeekCacheTasks,
   ]);
 
   const filteredStudents = useMemo(() => {
@@ -394,6 +636,23 @@ export function AdminPreviewPage() {
     return <Navigate to="/app/student" replace />;
   }
 
+  if (isBootstrapping) {
+    return (
+      <PreviewShell>
+        <BootScreen>
+          <BootSpinner aria-hidden />
+          <BootTitle>Admin paneli hazırlanıyor</BootTitle>
+          <BootSub>Tüm öğrenci verileri yükleniyor. Bu yalnızca ilk açılışta olur.</BootSub>
+          <BootTrack>
+            <BootFill $pct={bootProgress} />
+          </BootTrack>
+          <BootPercent>{Math.round(bootProgress)}%</BootPercent>
+          {error ? <ErrorText>{error}</ErrorText> : null}
+        </BootScreen>
+      </PreviewShell>
+    );
+  }
+
   const selectedStudent = students.find((student) => student.id === selectedStudentId);
   const selectedDate = weekDays[selectedDayIndex];
   const selectedDateKey = toDateKey(selectedDate);
@@ -417,6 +676,7 @@ export function AdminPreviewPage() {
           ...current,
           [selectedDateKey]: [...(current[selectedDateKey] ?? []), created],
         };
+        patchWeekCacheTasks(selectedStudent.id, next);
         syncSelectedStudentStatus(selectedStudent.id, next);
         return next;
       });
@@ -438,6 +698,7 @@ export function AdminPreviewPage() {
               : task,
           ),
         };
+        patchWeekCacheTasks(selectedStudent.id, next);
         syncSelectedStudentStatus(selectedStudent.id, next);
         return next;
       });
@@ -455,6 +716,7 @@ export function AdminPreviewPage() {
           ...current,
           [selectedDateKey]: (current[selectedDateKey] ?? []).filter((task) => task.id !== taskId),
         };
+        patchWeekCacheTasks(selectedStudent.id, next);
         syncSelectedStudentStatus(selectedStudent.id, next);
         return next;
       });
@@ -466,7 +728,11 @@ export function AdminPreviewPage() {
   const handleSaveAdminNote = async (body: string) => {
     if (!selectedStudent) return;
     await upsertAdminNote(selectedStudent.id, selectedDateKey, body);
-    setAdminNotesByDate((current) => ({ ...current, [selectedDateKey]: body }));
+    setAdminNotesByDate((current) => {
+      const next = { ...current, [selectedDateKey]: body };
+      patchWeekCacheNotes(selectedStudent.id, next);
+      return next;
+    });
   };
 
   const handleSaveMeeting = async (input: {
@@ -490,18 +756,21 @@ export function AdminPreviewPage() {
         delete next[selectedMeeting.meetingDate];
       }
       next[saved.meetingDate] = saved;
+      patchWeekCacheMeetings(selectedStudent.id, next);
       return next;
     });
     await refreshMeetingAlerts();
   };
 
   const handleDeleteMeeting = async (meetingId: string) => {
+    if (!selectedStudent) return;
     await deleteMeeting(meetingId);
     setMeetingsByDate((current) => {
       const next = { ...current };
       for (const [dateKey, meeting] of Object.entries(next)) {
         if (meeting.id === meetingId) delete next[dateKey];
       }
+      patchWeekCacheMeetings(selectedStudent.id, next);
       return next;
     });
     await refreshMeetingAlerts();
@@ -545,7 +814,7 @@ export function AdminPreviewPage() {
           </TopBarButton>
         </TopBarActions>
         <TopBarEnd>
-          <EarningsBadge title="Aylık kazanç = (aktif öğrenci − 1) × 5000">
+          <EarningsBadge title="Aylık kazanç = (aktif öğrenci − 2) × 5000">
             <LiveDotWrap aria-hidden>
               <LiveDotPulse />
               <LiveDotCore />

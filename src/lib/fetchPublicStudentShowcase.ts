@@ -3,6 +3,11 @@ import { parseTaskLabel } from '../app/utils/taskLabel';
 import { DEMO_STUDENTS, type DemoStudentShowcase } from '../data/demoStudentShowcase';
 import { supabase } from './supabase';
 
+/** Hidden from public /ogrenciler list, detail, and public student counts. */
+export const HIDDEN_PUBLIC_SHOWCASE_STUDENT_IDS = new Set([
+  'bd318631-4c4c-4318-93cd-3aef4c39fbf9',
+]);
+
 export type PublicStudentSummary = {
   id: string;
   displayName: string;
@@ -68,14 +73,16 @@ export async function fetchPublicStudentSummaries(): Promise<PublicStudentSummar
   if (error) throw error;
 
   const rows = Array.isArray(data) ? data : [];
-  return rows.map((row: Record<string, unknown>) => ({
-    id: String(row.id),
-    displayName: String(row.displayName ?? row.display_name ?? ''),
-    createdAt: String(row.createdAt ?? row.created_at ?? ''),
-    showcaseHighlight: String(
-      row.showcaseHighlight ?? row.showcase_highlight ?? '',
-    ).trim(),
-  }));
+  return rows
+    .map((row: Record<string, unknown>) => ({
+      id: String(row.id),
+      displayName: String(row.displayName ?? row.display_name ?? ''),
+      createdAt: String(row.createdAt ?? row.created_at ?? ''),
+      showcaseHighlight: String(
+        row.showcaseHighlight ?? row.showcase_highlight ?? '',
+      ).trim(),
+    }))
+    .filter((row) => !HIDDEN_PUBLIC_SHOWCASE_STUDENT_IDS.has(row.id));
 }
 
 export async function fetchShowcaseStudents(): Promise<ShowcaseStudent[]> {

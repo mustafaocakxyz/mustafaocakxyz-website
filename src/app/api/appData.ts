@@ -169,6 +169,105 @@ export async function fetchOrgTasksForDates(
   return grouped;
 }
 
+/** Admin: load tasks for all students in a date range (inclusive). */
+export async function fetchOrgTasksForRange(
+  fromDate: string,
+  toDate: string,
+): Promise<Record<string, Record<string, StudentTask[]>>> {
+  const { data, error } = await supabase
+    .from('daily_tasks')
+    .select('id, student_id, task_date, label, duration_label, completed, sort_order')
+    .gte('task_date', fromDate)
+    .lte('task_date', toDate)
+    .order('sort_order')
+    .order('created_at');
+
+  if (error) throw error;
+
+  const grouped: Record<string, Record<string, StudentTask[]>> = {};
+  for (const row of data ?? []) {
+    const task = row as DbDailyTask;
+    grouped[task.student_id] ??= {};
+    grouped[task.student_id][task.task_date] ??= [];
+    grouped[task.student_id][task.task_date].push(mapTask(task));
+  }
+
+  return grouped;
+}
+
+/** Admin: load submissions for all students in a date range. */
+export async function fetchOrgSubmissionsForRange(
+  fromDate: string,
+  toDate: string,
+): Promise<Record<string, Record<string, DailySubmission>>> {
+  const { data, error } = await supabase
+    .from('daily_submissions')
+    .select(
+      'id, student_id, submission_date, uyuma_saati, uyanma_saati, gunluk_calisma_saat, ekran_suresi_saat, notlar',
+    )
+    .gte('submission_date', fromDate)
+    .lte('submission_date', toDate);
+
+  if (error) throw error;
+
+  const grouped: Record<string, Record<string, DailySubmission>> = {};
+  for (const row of data ?? []) {
+    const submission = row as DbDailySubmission;
+    grouped[submission.student_id] ??= {};
+    grouped[submission.student_id][submission.submission_date] = mapSubmission(submission);
+  }
+
+  return grouped;
+}
+
+/** Admin: load admin notes for all students in a date range. */
+export async function fetchOrgAdminNotesForRange(
+  fromDate: string,
+  toDate: string,
+): Promise<Record<string, Record<string, string>>> {
+  const { data, error } = await supabase
+    .from('daily_admin_notes')
+    .select('id, student_id, note_date, body')
+    .gte('note_date', fromDate)
+    .lte('note_date', toDate);
+
+  if (error) throw error;
+
+  const grouped: Record<string, Record<string, string>> = {};
+  for (const row of data ?? []) {
+    const note = row as DbDailyAdminNote;
+    grouped[note.student_id] ??= {};
+    grouped[note.student_id][note.note_date] = note.body ?? '';
+  }
+
+  return grouped;
+}
+
+/** Admin: load meetings for all students in a date range. */
+export async function fetchOrgMeetingsForRange(
+  fromDate: string,
+  toDate: string,
+): Promise<Record<string, Record<string, StudentMeeting>>> {
+  const { data, error } = await supabase
+    .from('student_meetings')
+    .select('id, student_id, meeting_date, meeting_time, meeting_link')
+    .gte('meeting_date', fromDate)
+    .lte('meeting_date', toDate)
+    .order('meeting_date')
+    .order('meeting_time');
+
+  if (error) throw error;
+
+  const grouped: Record<string, Record<string, StudentMeeting>> = {};
+  for (const row of data ?? []) {
+    const meeting = mapMeeting(row as DbStudentMeeting);
+    grouped[meeting.studentId] ??= {};
+    grouped[meeting.studentId][meeting.meetingDate] = meeting;
+  }
+
+  return grouped;
+}
+
 export async function fetchSubmissionsForRange(
   studentId: string,
   fromDate: string,

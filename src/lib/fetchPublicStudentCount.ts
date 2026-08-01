@@ -1,3 +1,4 @@
+import { HIDDEN_PUBLIC_SHOWCASE_STUDENT_IDS } from './fetchPublicStudentShowcase';
 import { supabase } from './supabase';
 
 /** Active students in the Gelişim org — same filter as the admin dashboard list. */
@@ -7,5 +8,6 @@ export async function fetchPublicActiveStudentCount(): Promise<number> {
   if (error) throw error;
 
   const count = typeof data === 'number' ? data : Number(data);
-  return Number.isFinite(count) ? count : 0;
+  const raw = Number.isFinite(count) ? count : 0;
+  return Math.max(0, raw - HIDDEN_PUBLIC_SHOWCASE_STUDENT_IDS.size);
 }

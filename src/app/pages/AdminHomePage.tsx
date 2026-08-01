@@ -190,7 +190,7 @@ const EarningsAmount = styled.span`
 `;
 
 const PRICE_PER_STUDENT = 5000;
-const FREE_TRIAL_OFFSET = 1;
+const FREE_TRIAL_OFFSET = 2;
 
 function formatMonthlyEarnings(activeStudentCount: number): string {
   const paying = Math.max(0, activeStudentCount - FREE_TRIAL_OFFSET);
@@ -640,7 +640,7 @@ export function AdminHomePage() {
               Öğrenci seçerek günlük görevleri yönetebilir ve formları görüntüleyebilirsin.
             </AppSubtitle>
           </HeaderCopy>
-          <EarningsBadge title="Aylık kazanç = (aktif öğrenci − 1) × 5000">
+          <EarningsBadge title="Aylık kazanç = (aktif öğrenci − 2) × 5000">
             <LiveDotWrap aria-hidden>
               <LiveDotPulse />
               <LiveDotCore />
