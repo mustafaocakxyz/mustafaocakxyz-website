@@ -83,6 +83,7 @@ import {
   SidebarTitle,
   StatusChip,
   StudentCardButton,
+  StudentListScroll,
   StudentName,
   ChatGlowButton,
   TopBarActions,
@@ -860,40 +861,42 @@ export function AdminPreviewPage() {
                 %50 ?
               </FilterChip>
             </FilterRow>
-            {filteredStudents.map((student) => {
-              const status = studentStatuses[student.id];
-              const tomorrowReady = status?.tomorrowReady ?? false;
-              const todayTone = status?.todayTone ?? 'muted';
-              const todayLabel =
-                status?.todayPercent === null || status?.todayPercent === undefined
-                  ? '—'
-                  : `${status.todayPercent}%`;
+            <StudentListScroll>
+              {filteredStudents.map((student) => {
+                const status = studentStatuses[student.id];
+                const tomorrowReady = status?.tomorrowReady ?? false;
+                const todayTone = status?.todayTone ?? 'muted';
+                const todayLabel =
+                  status?.todayPercent === null || status?.todayPercent === undefined
+                    ? '—'
+                    : `${status.todayPercent}%`;
 
-              return (
-                <StudentCardButton
-                  key={student.id}
-                  type="button"
-                  $selected={student.id === selectedStudentId}
-                  onClick={() => setSelectedStudentId(student.id)}
-                >
-                  <StudentName>{student.name}</StudentName>
-                  <PillRow>
-                    <StatusChip $ready={tomorrowReady}>
-                      Yarın {tomorrowReady ? '✅' : '❌'}
-                    </StatusChip>
-                    <StatusChip $tone={todayTone}>{todayLabel}</StatusChip>
-                    {studentsWithUpcomingMeeting.has(student.id) ? (
-                      <MeetingAlertPill title="Yaklaşan görüşme" aria-label="Yaklaşan görüşme">
-                        <Video size={13} strokeWidth={2.4} />
-                      </MeetingAlertPill>
-                    ) : null}
-                  </PillRow>
-                </StudentCardButton>
-              );
-            })}
-            {filteredStudents.length === 0 && !isPageLoading ? (
-              <EmptyState>Öğrenci bulunamadı.</EmptyState>
-            ) : null}
+                return (
+                  <StudentCardButton
+                    key={student.id}
+                    type="button"
+                    $selected={student.id === selectedStudentId}
+                    onClick={() => setSelectedStudentId(student.id)}
+                  >
+                    <StudentName>{student.name}</StudentName>
+                    <PillRow>
+                      <StatusChip $ready={tomorrowReady}>
+                        Yarın {tomorrowReady ? '✅' : '❌'}
+                      </StatusChip>
+                      <StatusChip $tone={todayTone}>{todayLabel}</StatusChip>
+                      {studentsWithUpcomingMeeting.has(student.id) ? (
+                        <MeetingAlertPill title="Yaklaşan görüşme" aria-label="Yaklaşan görüşme">
+                          <Video size={13} strokeWidth={2.4} />
+                        </MeetingAlertPill>
+                      ) : null}
+                    </PillRow>
+                  </StudentCardButton>
+                );
+              })}
+              {filteredStudents.length === 0 && !isPageLoading ? (
+                <EmptyState>Öğrenci bulunamadı.</EmptyState>
+              ) : null}
+            </StudentListScroll>
           </Sidebar>
 
           <MainPanel>

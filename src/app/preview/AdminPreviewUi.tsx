@@ -369,8 +369,26 @@ export const Sidebar = styled.aside`
   background: ${t.panel};
   position: sticky;
   top: 12px;
-  max-height: calc(100vh - 24px);
-  overflow: auto;
+  height: calc((100dvh - 100px) * 0.95);
+  max-height: calc((100dvh - 100px) * 0.95);
+  overflow: hidden;
+  box-sizing: border-box;
+
+  @media (max-width: 960px) {
+    position: static;
+    height: auto;
+    max-height: none;
+  }
+`;
+
+export const StudentListScroll = styled.div`
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
   scrollbar-width: none;
   -ms-overflow-style: none;
 
@@ -381,8 +399,8 @@ export const Sidebar = styled.aside`
   }
 
   @media (max-width: 960px) {
-    position: static;
-    max-height: none;
+    flex: none;
+    max-height: min(320px, 45vh);
   }
 `;
 
