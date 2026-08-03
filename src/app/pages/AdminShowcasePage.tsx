@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
   fetchStudentShowcaseHighlights,
   updateShowcaseSortOrders,
-  updateStudentShowcaseHighlight,
+  updateStudentShowcaseHighlights,
 } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
 import { preview as t } from '../preview/adminPreviewTheme';
@@ -125,20 +125,30 @@ const FieldLabel = styled.label`
   color: ${t.muted};
 `;
 
-const HighlightTextarea = styled.textarea`
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 120px;
+const PillEditorList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 8px;
-  padding: 12px 14px;
+`;
+
+const PillEditorRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const PillInput = styled.input`
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 12px;
   border-radius: ${t.radiusSm};
   border: 1px solid ${t.border};
   background: ${t.panel2};
   color: ${t.text};
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-family: inherit;
-  line-height: 1.5;
-  resize: vertical;
   outline: none;
 
   &:focus {
@@ -148,6 +158,60 @@ const HighlightTextarea = styled.textarea`
 
   &::placeholder {
     color: ${t.mutedSoft};
+  }
+`;
+
+const IconActionButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid ${t.border};
+  background: ${t.panel2};
+  color: ${t.muted};
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: ${t.text};
+    border-color: rgba(96, 165, 250, 0.45);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+`;
+
+const DangerIconButton = styled(IconActionButton)`
+  &:hover:not(:disabled) {
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.45);
+    background: rgba(248, 113, 113, 0.1);
+  }
+`;
+
+const AddPillButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px dashed rgba(96, 165, 250, 0.45);
+  background: rgba(59, 130, 246, 0.08);
+  color: rgba(147, 197, 253, 0.95);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(59, 130, 246, 0.14);
+    border-color: rgba(96, 165, 250, 0.65);
   }
 `;
 
@@ -174,7 +238,7 @@ const SuccessText = styled.p`
 type StudentHighlight = {
   id: string;
   name: string;
-  showcaseHighlight: string;
+  showcaseHighlights: string[];
   showcaseSortOrder: number;
 };
 
@@ -182,7 +246,7 @@ export function AdminShowcasePage() {
   const { user, isLoading } = useAppAuth();
   const [students, setStudents] = useState<StudentHighlight[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState<string[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
@@ -219,7 +283,7 @@ export function AdminShowcasePage() {
 
   useEffect(() => {
     const selected = students.find((entry) => entry.id === selectedId);
-    setDraft(selected?.showcaseHighlight ?? '');
+    setDraft([...(selected?.showcaseHighlights ?? [])]);
     setSavedMessage('');
   }, [selectedId, students]);
 
@@ -243,18 +307,33 @@ export function AdminShowcasePage() {
 
   const selected = students.find((entry) => entry.id === selectedId) ?? null;
 
+  const updateDraftAt = (index: number, value: string) => {
+    setDraft((current) => current.map((entry, i) => (i === index ? value : entry)));
+    setSavedMessage('');
+  };
+
+  const removeDraftAt = (index: number) => {
+    setDraft((current) => current.filter((_, i) => i !== index));
+    setSavedMessage('');
+  };
+
+  const addDraftPill = () => {
+    setDraft((current) => [...current, '']);
+    setSavedMessage('');
+  };
+
   const handleSave = async () => {
     if (!selected) return;
     setIsSaving(true);
     setError('');
     setSavedMessage('');
     try {
-      const nextValue = draft.trim();
-      await updateStudentShowcaseHighlight(selected.id, nextValue);
+      const nextValue = draft.map((entry) => entry.trim()).filter(Boolean);
+      await updateStudentShowcaseHighlights(selected.id, nextValue);
       setStudents((current) =>
         current.map((entry) =>
           entry.id === selected.id
-            ? { ...entry, showcaseHighlight: nextValue }
+            ? { ...entry, showcaseHighlights: nextValue }
             : entry,
         ),
       );
@@ -309,8 +388,8 @@ export function AdminShowcasePage() {
         <PreviewFrame>
           <PageIntro>
             <ContentSub>
-              Öğrenci seçip serbest metin gir. Soldaki oklarla /ogrenciler sırasını
-              değiştir. Boş bırakırsan öne çıkan kart gizlenir.
+              Öğrenci seçip istediğin kadar pill ekle. Soldaki oklarla /ogrenciler
+              sırasını değiştir. Hiçbir pill yoksa öne çıkan alan gizlenir.
             </ContentSub>
           </PageIntro>
 
@@ -357,16 +436,35 @@ export function AdminShowcasePage() {
               {selected ? (
                 <FieldsStack>
                   <div>
-                    <FieldLabel htmlFor="showcase-highlight">Öne çıkan başarı metni</FieldLabel>
-                    <HighlightTextarea
-                      id="showcase-highlight"
-                      placeholder="Örn. TYT 24 netten 52 nete çıkardı"
-                      value={draft}
-                      onChange={(event) => {
-                        setDraft(event.target.value);
-                        setSavedMessage('');
-                      }}
-                    />
+                    <FieldLabel>Kayda değer pilleri</FieldLabel>
+                    <PillEditorList>
+                      {draft.map((value, index) => (
+                        <PillEditorRow key={`pill-${index}`}>
+                          <PillInput
+                            value={value}
+                            placeholder="Örn. TYT 24 → 52"
+                            onChange={(event) => updateDraftAt(index, event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') {
+                                event.preventDefault();
+                                void handleSave();
+                              }
+                            }}
+                          />
+                          <DangerIconButton
+                            type="button"
+                            aria-label="Pili sil"
+                            onClick={() => removeDraftAt(index)}
+                          >
+                            <Trash2 size={15} />
+                          </DangerIconButton>
+                        </PillEditorRow>
+                      ))}
+                    </PillEditorList>
+                    <AddPillButton type="button" onClick={addDraftPill}>
+                      <Plus size={15} />
+                      Pill ekle
+                    </AddPillButton>
                   </div>
                   <Hint>
                     Örnekler: “6+ saat çalışma”, “AYT Mat 0 → 16”, “22 gündür aktif”

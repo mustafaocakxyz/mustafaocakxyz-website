@@ -190,11 +190,13 @@ export function OgrenciDetailPage() {
         <StudentTitle $detail>{student.shortName}</StudentTitle>
         <Days>{student.daysInProgram} gündür programda</Days>
 
-        {student.highlight ? (
+        {student.highlights.length > 0 ? (
           <FeaturedPanel>
             <PanelTitle>Kayda değer</PanelTitle>
             <PillRow>
-              <SoftPill>{student.highlight}</SoftPill>
+              {student.highlights.map((highlight, index) => (
+                <SoftPill key={`${index}-${highlight}`}>{highlight}</SoftPill>
+              ))}
             </PillRow>
           </FeaturedPanel>
         ) : null}

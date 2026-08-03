@@ -12,7 +12,7 @@ export type PublicStudentSummary = {
   id: string;
   displayName: string;
   createdAt: string;
-  showcaseHighlight: string;
+  showcaseHighlights: string[];
 };
 
 export type ShowcaseStudent = {
@@ -23,8 +23,8 @@ export type ShowcaseStudent = {
   avgStudyHours: string;
   avgScreenTime: string;
   sleepSchedule: string;
-  /** Real curated text; empty = hide featured UI */
-  highlight: string;
+  /** Real curated pills; empty = hide featured UI */
+  highlights: string[];
   netChanges?: DemoStudentShowcase['netChanges'];
 };
 
@@ -50,6 +50,17 @@ function demoTemplateForIndex(index: number): DemoStudentShowcase {
   return DEMO_STUDENTS[index % DEMO_STUDENTS.length];
 }
 
+export function normalizeShowcaseHighlights(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.map((entry) => String(entry ?? '').trim()).filter(Boolean);
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    return trimmed ? [trimmed] : [];
+  }
+  return [];
+}
+
 export function toShowcaseStudent(
   summary: PublicStudentSummary,
   demoIndex: number,
@@ -62,7 +73,7 @@ export function toShowcaseStudent(
     avgStudyHours: demo.avgStudyHours,
     avgScreenTime: demo.avgScreenTime,
     sleepSchedule: demo.sleepSchedule,
-    highlight: summary.showcaseHighlight.trim(),
+    highlights: summary.showcaseHighlights,
     netChanges: demo.netChanges,
   };
 }
@@ -78,9 +89,12 @@ export async function fetchPublicStudentSummaries(): Promise<PublicStudentSummar
       id: String(row.id),
       displayName: String(row.displayName ?? row.display_name ?? ''),
       createdAt: String(row.createdAt ?? row.created_at ?? ''),
-      showcaseHighlight: String(
-        row.showcaseHighlight ?? row.showcase_highlight ?? '',
-      ).trim(),
+      showcaseHighlights: normalizeShowcaseHighlights(
+        row.showcaseHighlights ??
+          row.showcase_highlights ??
+          row.showcaseHighlight ??
+          row.showcase_highlight,
+      ),
     }))
     .filter((row) => !HIDDEN_PUBLIC_SHOWCASE_STUDENT_IDS.has(row.id));
 }

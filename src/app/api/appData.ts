@@ -612,7 +612,12 @@ export async function deleteTask(taskId: string) {
 }
 
 export async function fetchStudentShowcaseHighlights(): Promise<
-  Array<{ id: string; name: string; showcaseHighlight: string; showcaseSortOrder: number }>
+  Array<{
+    id: string;
+    name: string;
+    showcaseHighlights: string[];
+    showcaseSortOrder: number;
+  }>
 > {
   const { data, error } = await supabase
     .from('profiles')
@@ -627,22 +632,34 @@ export async function fetchStudentShowcaseHighlights(): Promise<
   return (data ?? []).map((row) => ({
     id: row.id as string,
     name: row.display_name as string,
-    showcaseHighlight: (row.showcase_highlight as string | null) ?? '',
+    showcaseHighlights: normalizeShowcaseHighlights(row.showcase_highlight),
     showcaseSortOrder: Number(row.showcase_sort_order ?? 0),
   }));
 }
 
-export async function updateStudentShowcaseHighlight(
+export async function updateStudentShowcaseHighlights(
   studentId: string,
-  showcaseHighlight: string,
+  showcaseHighlights: string[],
 ) {
+  const cleaned = showcaseHighlights.map((entry) => entry.trim()).filter(Boolean);
   const { error } = await supabase
     .from('profiles')
-    .update({ showcase_highlight: showcaseHighlight.trim() })
+    .update({ showcase_highlight: cleaned })
     .eq('id', studentId)
     .eq('role', 'student');
 
   if (error) throw error;
+}
+
+function normalizeShowcaseHighlights(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.map((entry) => String(entry ?? '').trim()).filter(Boolean);
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    return trimmed ? [trimmed] : [];
+  }
+  return [];
 }
 
 /** Persist full showcase list order (index = sort order). */

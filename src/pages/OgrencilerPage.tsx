@@ -167,9 +167,11 @@ export function OgrencilerPage() {
                 <Name>{student.shortName}</Name>
                 <Days>{student.daysInProgram} gündür çalışıyor</Days>
               </CardTop>
-              {student.highlight ? (
+              {student.highlights.length > 0 ? (
                 <MetaRow>
-                  <SoftPill>{student.highlight}</SoftPill>
+                  {student.highlights.map((highlight, index) => (
+                    <SoftPill key={`${index}-${highlight}`}>{highlight}</SoftPill>
+                  ))}
                 </MetaRow>
               ) : null}
               <CardHint>Öğrenci detayına git →</CardHint>
