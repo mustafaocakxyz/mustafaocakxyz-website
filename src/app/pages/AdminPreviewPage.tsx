@@ -8,6 +8,7 @@ import {
   deleteMeeting,
   deleteTask,
   exportOrganizationJson,
+  exportStudentJson,
   fetchOrgAdminNotesForRange,
   fetchOrgMeetingsForRange,
   fetchOrgSubmissionsForRange,
@@ -270,6 +271,38 @@ const BootPercent = styled.span`
   font-size: 0.82rem;
   font-weight: 700;
   color: ${t.mutedSoft};
+`;
+
+const IdentityNameRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+`;
+
+const StudentExportButton = styled.button`
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.55);
+  background: rgba(250, 204, 21, 0.18);
+  color: #facc15;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(250, 204, 21, 0.28);
+    border-color: rgba(250, 204, 21, 0.75);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 export function AdminPreviewPage() {
@@ -778,6 +811,21 @@ export function AdminPreviewPage() {
     await refreshMeetingAlerts();
   };
 
+  const handleExportStudent = async () => {
+    if (!selectedStudent) return;
+
+    setIsExporting(true);
+    setError('');
+    try {
+      const data = await exportStudentJson(selectedStudent.id);
+      downloadJson(`${selectedStudent.name}-export.json`, data);
+    } catch {
+      setError('Öğrenci dışa aktarımı başarısız.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleExportOrganization = async () => {
     setIsExporting(true);
     setError('');
@@ -911,7 +959,17 @@ export function AdminPreviewPage() {
                       >
                         {initials(selectedStudent.name)}
                       </Avatar>
-                      <IdentityTitle>{selectedStudent.name}</IdentityTitle>
+                      <IdentityNameRow>
+                        <IdentityTitle>{selectedStudent.name}</IdentityTitle>
+                        <StudentExportButton
+                          type="button"
+                          disabled={isExporting}
+                          onClick={() => void handleExportStudent()}
+                          title="Öğrenci verilerini JSON olarak dışa aktar"
+                        >
+                          JSON
+                        </StudentExportButton>
+                      </IdentityNameRow>
                     </IdentityLeft>
                     {!isDayView ? (
                       <AccentButton type="button" onClick={() => setSection('tasks')}>
