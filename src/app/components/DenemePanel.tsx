@@ -1159,19 +1159,6 @@ const CardDateRow = styled.div`
   }
 `;
 
-const TypePill = styled.span`
-  display: inline-flex;
-  align-items: center;
-  padding: 5px 11px;
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  color: #a5b4fc;
-  background: rgba(99, 102, 241, 0.22);
-  border: 1px solid rgba(129, 140, 248, 0.5);
-`;
-
 const WrongTopicPill = styled.span`
   display: inline-flex;
   align-items: center;
