@@ -77,3 +77,24 @@ export type DbChatMessage = {
   attachment_path: string | null;
   created_at: string;
 };
+
+export type DbDenemeLeafScore = {
+  leafId: string;
+  correct: number;
+  wrong: number;
+};
+
+export type DbDenemeEntry = {
+  id: string;
+  organization_id: string;
+  student_id: string;
+  deneme_date: string;
+  name: string;
+  duration: string;
+  type_id: string;
+  scores: DbDenemeLeafScore[] | unknown;
+  topics: string[] | unknown;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};

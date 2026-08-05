@@ -57,6 +57,35 @@ export type ChatMessage = {
   createdAt: string;
 };
 
+export type DenemeLeafScore = {
+  leafId: string;
+  correct: number;
+  wrong: number;
+};
+
+export type DenemeEntry = {
+  id: string;
+  studentId: string;
+  denemeDate: string;
+  name: string;
+  duration: string;
+  typeId: string;
+  scores: DenemeLeafScore[];
+  topics: string[];
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DenemeEntryInput = {
+  denemeDate: string;
+  name: string;
+  duration: string;
+  typeId: string;
+  scores: DenemeLeafScore[];
+  topics: string[];
+};
+
 export const emptyDailySubmission = (): DailySubmission => ({
   uyumaSaati: null,
   uyanmaSaati: null,

@@ -3,8 +3,12 @@ import { formatDayPill } from '../utils/dates';
 import { preview as t } from './adminPreviewTheme';
 
 export const PreviewShell = styled.div`
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 100vh;
   min-height: 100dvh;
+  overflow-x: clip;
   background: ${t.bg};
   color: ${t.text};
   font-family: ${t.font};
@@ -700,6 +704,10 @@ export const IdentityNavButton = styled.button<{ $active: boolean }>`
 `;
 
 export const DaySliderPanel = styled.div`
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 12px;
   border-radius: ${t.radiusLg};
   border: 1px solid ${t.border};
@@ -710,13 +718,17 @@ export const DaySliderRow = styled.div`
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 8px;
+  min-width: 0;
+  width: 100%;
 
   @media (max-width: 560px) {
     display: flex;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
     scrollbar-width: none;
     -ms-overflow-style: none;
     padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
 
     &::-webkit-scrollbar {
       display: none;
@@ -833,6 +845,10 @@ export const SectionPill = styled.button<{ $active: boolean }>`
 `;
 
 export const ContentCard = styled.section`
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 16px;
   border-radius: ${t.radiusLg};
   border: 1px solid ${t.border};
@@ -840,7 +856,7 @@ export const ContentCard = styled.section`
   display: flex;
   flex-direction: column;
   gap: 14px;
-  min-width: 0;
+  overflow-x: clip;
 `;
 
 export const SectionStack = styled.div`

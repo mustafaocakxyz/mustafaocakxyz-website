@@ -4,11 +4,14 @@ import { Link, Navigate } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import {
   applyDailyTaskChange,
+  createDenemeEntry,
   createTask,
+  deleteDenemeEntry,
   deleteMeeting,
   deleteTask,
   exportOrganizationJson,
   exportStudentJson,
+  fetchDenemesForStudent,
   fetchOrgAdminNotesForRange,
   fetchOrgMeetingsForRange,
   fetchOrgSubmissionsForRange,
@@ -22,12 +25,21 @@ import {
   fetchMeetingsForRange,
   getSubmissionForDate,
   subscribeDailyTasks,
+  updateDenemeEntry,
   updateTaskLabel,
   upsertAdminNote,
   upsertMeeting,
 } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
-import type { DailySubmission, StudentMeeting, StudentSummary, StudentTask } from '../types';
+import { DenemePanel } from '../components/DenemePanel';
+import type {
+  DailySubmission,
+  DenemeEntry,
+  DenemeEntryInput,
+  StudentMeeting,
+  StudentSummary,
+  StudentTask,
+} from '../types';
 import {
   addDaysToDateKey,
   buildWeekDays,
@@ -36,11 +48,7 @@ import {
 } from '../utils/dates';
 import { downloadJson } from '../utils/download';
 import { computeCompletionPercent } from '../utils/taskLabel';
-import {
-  CoachNotesSection,
-  DenemeSection,
-  KonuMateryalSection,
-} from '../preview/AdminPreviewSections';
+import { CoachNotesSection, KonuMateryalSection } from '../preview/AdminPreviewSections';
 import {
   PreviewDayNoteRail,
   PreviewFormSection,
@@ -113,7 +121,7 @@ const DAY_SECTIONS: { id: Extract<SectionId, 'tasks' | 'form'>; label: string }[
 
 const PROFILE_SECTIONS: { id: Extract<SectionId, 'topics' | 'exams' | 'notes'>; label: string }[] = [
   { id: 'topics', label: 'Konu & Materyal' },
-  { id: 'exams', label: 'Deneme' },
+  { id: 'exams', label: 'Denemeler' },
   { id: 'notes', label: 'Notlar' },
 ];
 
@@ -207,6 +215,13 @@ function emptyWeekSnapshot(): StudentWeekSnapshot {
   };
 }
 
+function sortDenemesNewestFirst(entries: DenemeEntry[]): DenemeEntry[] {
+  return [...entries].sort((a, b) => {
+    if (a.denemeDate !== b.denemeDate) return a.denemeDate < b.denemeDate ? 1 : -1;
+    return a.createdAt < b.createdAt ? 1 : -1;
+  });
+}
+
 const bootSpin = keyframes`
   to {
     transform: rotate(360deg);
@@ -273,6 +288,19 @@ const BootPercent = styled.span`
   color: ${t.mutedSoft};
 `;
 
+const DenemeContentCard = styled(ContentCard)`
+  /* Match student-list bottom: sidebar height minus identity card + panel gap above. */
+  height: calc((100dvh - 100px) * 0.95 - 152px);
+  max-height: calc((100dvh - 100px) * 0.95 - 152px);
+  overflow: hidden;
+  box-sizing: border-box;
+
+  @media (max-width: 960px) {
+    height: auto;
+    max-height: min(70vh, 640px);
+  }
+`;
+
 const IdentityNameRow = styled.div`
   display: flex;
   align-items: center;
@@ -326,6 +354,8 @@ export function AdminPreviewPage() {
   const [submissionsByDate, setSubmissionsByDate] = useState<Record<string, DailySubmission>>({});
   const [adminNotesByDate, setAdminNotesByDate] = useState<Record<string, string>>({});
   const [meetingsByDate, setMeetingsByDate] = useState<Record<string, StudentMeeting>>({});
+  const [denemes, setDenemes] = useState<DenemeEntry[]>([]);
+  const denemeCacheRef = useRef<Map<string, DenemeEntry[]>>(new Map());
   const [studentsWithUpcomingMeeting, setStudentsWithUpcomingMeeting] = useState<Set<string>>(
     () => new Set(),
   );
@@ -425,6 +455,8 @@ export function AdminPreviewPage() {
     setBootProgress(4);
     setError('');
     weekCacheRef.current.clear();
+    denemeCacheRef.current.clear();
+    setDenemes([]);
 
     const bump = (value: number) => {
       if (isMounted) setBootProgress((current) => Math.max(current, value));
@@ -520,12 +552,32 @@ export function AdminPreviewPage() {
     setError('');
     setSection('tasks');
 
+    const cachedDenemes = denemeCacheRef.current.get(studentId);
+    if (cachedDenemes) {
+      setDenemes(cachedDenemes);
+    } else {
+      setDenemes([]);
+    }
+
     if (cached) {
       applyWeekSnapshot(cached);
       syncSelectedStudentStatus(studentId, cached.tasksByDate);
       setIsPageLoading(false);
       if (skipRevalidateOnceRef.current) {
         skipRevalidateOnceRef.current = false;
+        if (cachedDenemes) return;
+
+        const loadDenemesOnly = async () => {
+          try {
+            const studentDenemes = await fetchDenemesForStudent(studentId);
+            if (!isMounted) return;
+            denemeCacheRef.current.set(studentId, studentDenemes);
+            setDenemes(studentDenemes);
+          } catch {
+            if (isMounted) setError('Deneme kayıtları yüklenemedi.');
+          }
+        };
+        void loadDenemesOnly();
         return;
       }
     } else {
@@ -538,11 +590,12 @@ export function AdminPreviewPage() {
 
     const loadStudentWeek = async () => {
       try {
-        const [tasks, submissions, adminNotes, meetings] = await Promise.all([
+        const [tasks, submissions, adminNotes, meetings, studentDenemes] = await Promise.all([
           fetchTasksForRange(studentId, weekFrom, weekTo),
           fetchSubmissionsForRange(studentId, weekFrom, weekTo),
           fetchAdminNotesForRange(studentId, weekFrom, weekTo),
           fetchMeetingsForRange(studentId, weekFrom, weekTo),
+          fetchDenemesForStudent(studentId),
         ]);
         if (!isMounted) return;
         const snapshot: StudentWeekSnapshot = {
@@ -553,6 +606,8 @@ export function AdminPreviewPage() {
         };
         writeWeekCache(studentId, snapshot);
         applyWeekSnapshot(snapshot);
+        denemeCacheRef.current.set(studentId, studentDenemes);
+        setDenemes(studentDenemes);
         syncSelectedStudentStatus(studentId, tasks);
       } catch {
         if (isMounted) setError('Öğrenci verileri yüklenemedi.');
@@ -696,6 +751,8 @@ export function AdminPreviewPage() {
   const adminNote = adminNotesByDate[selectedDateKey] ?? '';
   const selectedMeeting = meetingsByDate[selectedDateKey] ?? null;
   const isDayView = section === 'tasks' || section === 'form';
+  const showDaySlider = isDayView;
+  const showReturnToTasks = !isDayView;
 
   const handleAddTask = async (label: string) => {
     if (!selectedStudent) return;
@@ -809,6 +866,40 @@ export function AdminPreviewPage() {
       return next;
     });
     await refreshMeetingAlerts();
+  };
+
+  const upsertDenemeInState = (entry: DenemeEntry) => {
+    if (!selectedStudent) return;
+    setDenemes((current) => {
+      const next = sortDenemesNewestFirst([
+        entry,
+        ...current.filter((item) => item.id !== entry.id),
+      ]);
+      denemeCacheRef.current.set(selectedStudent.id, next);
+      return next;
+    });
+  };
+
+  const handleCreateDeneme = async (input: DenemeEntryInput) => {
+    if (!selectedStudent || !user) return;
+    const created = await createDenemeEntry(selectedStudent.id, input, user.id);
+    upsertDenemeInState(created);
+  };
+
+  const handleUpdateDeneme = async (id: string, input: DenemeEntryInput) => {
+    if (!selectedStudent) return;
+    const updated = await updateDenemeEntry(id, input);
+    upsertDenemeInState(updated);
+  };
+
+  const handleDeleteDeneme = async (id: string) => {
+    if (!selectedStudent) return;
+    await deleteDenemeEntry(id);
+    setDenemes((current) => {
+      const next = current.filter((item) => item.id !== id);
+      denemeCacheRef.current.set(selectedStudent.id, next);
+      return next;
+    });
   };
 
   const handleExportStudent = async () => {
@@ -971,7 +1062,7 @@ export function AdminPreviewPage() {
                         </StudentExportButton>
                       </IdentityNameRow>
                     </IdentityLeft>
-                    {!isDayView ? (
+                    {showReturnToTasks ? (
                       <AccentButton type="button" onClick={() => setSection('tasks')}>
                         Görevlere dön
                       </AccentButton>
@@ -991,7 +1082,7 @@ export function AdminPreviewPage() {
                   </IdentityNav>
                 </IdentityCard>
 
-                {isDayView ? (
+                {showDaySlider ? (
                   <>
                     <PreviewDaySlider
                       days={weekDays}
@@ -999,18 +1090,20 @@ export function AdminPreviewPage() {
                       onSelect={setSelectedDayIndex}
                     />
 
-                    <SectionPillRow>
-                      {DAY_SECTIONS.map((item) => (
-                        <SectionPill
-                          key={item.id}
-                          type="button"
-                          $active={section === item.id}
-                          onClick={() => setSection(item.id)}
-                        >
-                          {item.label}
-                        </SectionPill>
-                      ))}
-                    </SectionPillRow>
+                    {isDayView ? (
+                      <SectionPillRow>
+                        {DAY_SECTIONS.map((item) => (
+                          <SectionPill
+                            key={item.id}
+                            type="button"
+                            $active={section === item.id}
+                            onClick={() => setSection(item.id)}
+                          >
+                            {item.label}
+                          </SectionPill>
+                        ))}
+                      </SectionPillRow>
+                    ) : null}
                   </>
                 ) : null}
 
@@ -1042,9 +1135,15 @@ export function AdminPreviewPage() {
                 ) : null}
 
                 {section === 'exams' ? (
-                  <ContentCard>
-                    <DenemeSection studentName={selectedStudent.name} />
-                  </ContentCard>
+                  <DenemeContentCard>
+                    <DenemePanel
+                      key={selectedStudent.id}
+                      entries={denemes}
+                      onCreate={handleCreateDeneme}
+                      onUpdate={handleUpdateDeneme}
+                      onDelete={handleDeleteDeneme}
+                    />
+                  </DenemeContentCard>
                 ) : null}
 
                 {section === 'notes' ? (

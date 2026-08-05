@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
   chatAttachmentFileName,
@@ -12,59 +12,42 @@ import {
   subscribeChatMessages,
 } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
+import {
+  StudentPageBody,
+  StudentPageFrame,
+  StudentPanelCard,
+  StudentShell,
+  StudentSubActions,
+  StudentSubLink,
+  StudentSubTitle,
+  StudentSubTopBar,
+} from '../components/StudentShell';
 import { preview as t } from '../preview/adminPreviewTheme';
 import {
-  ContentCard,
   ContentSub,
   ContentTitle,
   ErrorText,
   LoadingText,
-  PreviewShell,
-  PreviewTopBar,
-  TopBarActions,
-  TopBarButton,
-  TopBarEnd,
-  TopBarTitle,
 } from '../preview/AdminPreviewUi';
 import type { ChatMessage } from '../types';
 import { getCachedChatSignedUrlSync } from '../utils/chatSignedUrlCache';
 
-const CHAT_STAGE_HEIGHT = 'calc(100dvh - 180px)';
-
-const StudentChatBody = styled.div`
-  width: 100%;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-height: 0;
-`;
-
-const StudentChatFrame = styled.div`
-  width: 100%;
-  max-width: 720px;
-  box-sizing: border-box;
-  padding: 16px 16px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+const ChatPanel = styled(StudentPanelCard)`
   flex: 1;
   min-height: 0;
+  height: calc(100dvh - 148px);
+  max-height: calc(100dvh - 148px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
 
   @media (min-width: 640px) {
-    padding: 20px 24px 28px;
+    height: calc(100dvh - 160px);
+    max-height: calc(100dvh - 160px);
+    min-height: 420px;
+    gap: 12px;
   }
-`;
-
-const ChatPanel = styled(ContentCard)`
-  height: ${CHAT_STAGE_HEIGHT};
-  min-height: 420px;
-  max-height: ${CHAT_STAGE_HEIGHT};
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow: hidden;
-  box-sizing: border-box;
 `;
 
 const ChatPanelHead = styled.div`
@@ -101,7 +84,9 @@ const ComposerWrap = styled.div`
 
 const Bubble = styled.div<{ $mine: boolean }>`
   align-self: ${({ $mine }) => ($mine ? 'flex-end' : 'flex-start')};
-  max-width: min(80%, 480px);
+  max-width: min(88%, 480px);
+  min-width: 0;
+  box-sizing: border-box;
   padding: 10px 14px;
   border-radius: ${t.radiusMd};
   border: 1px solid ${({ $mine }) => ($mine ? t.accentBorder : t.border)};
@@ -110,6 +95,7 @@ const Bubble = styled.div<{ $mine: boolean }>`
   font-size: 0.92rem;
   line-height: 1.45;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
 `;
 
@@ -122,7 +108,7 @@ const Meta = styled.span`
 
 const AttachmentImage = styled.img`
   display: block;
-  max-width: 260px;
+  max-width: min(100%, 260px);
   max-height: 200px;
   border-radius: ${t.radiusSm};
   margin-bottom: 6px;
@@ -145,6 +131,8 @@ const AttachRow = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
+  width: 100%;
 `;
 
 const VoicePlayerRow = styled.button`
@@ -152,7 +140,9 @@ const VoicePlayerRow = styled.button`
   align-items: center;
   gap: 10px;
   margin-bottom: 6px;
-  min-width: 180px;
+  max-width: 100%;
+  min-width: 0;
+  width: min(100%, 220px);
   padding: 8px 12px 8px 8px;
   border-radius: 999px;
   border: 1px solid ${t.borderStrong};
@@ -247,10 +237,18 @@ const Composer = styled.form`
   display: flex;
   gap: 10px;
   align-items: flex-end;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
 `;
 
 const ComposerInput = styled.textarea`
   flex: 1;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   min-height: 48px;
   max-height: 120px;
   padding: 12px 14px;
@@ -282,6 +280,10 @@ const SendButton = styled.button`
   font-family: inherit;
   cursor: pointer;
   box-shadow: 0 0 16px rgba(199, 44, 121, 0.28);
+
+  @media (max-width: 480px) {
+    width: 100%;
+  }
 
   &:disabled {
     opacity: 0.5;
@@ -501,13 +503,11 @@ export function StudentChatPage() {
 
   if (isLoading) {
     return (
-      <PreviewShell>
-        <StudentChatBody>
-          <StudentChatFrame>
-            <LoadingText>Yükleniyor...</LoadingText>
-          </StudentChatFrame>
-        </StudentChatBody>
-      </PreviewShell>
+      <StudentShell>
+        <StudentPageFrame>
+          <LoadingText>Yükleniyor...</LoadingText>
+        </StudentPageFrame>
+      </StudentShell>
     );
   }
 
@@ -640,19 +640,17 @@ export function StudentChatPage() {
   };
 
   return (
-    <PreviewShell>
-      <PreviewTopBar>
-        <TopBarTitle>Sohbet</TopBarTitle>
-        <TopBarActions>
-          <TopBarButton as={Link} to="/app/student">
-            ← Panele dön
-          </TopBarButton>
-        </TopBarActions>
-        <TopBarEnd />
-      </PreviewTopBar>
+    <StudentShell>
+      <StudentSubTopBar>
+        <StudentSubTitle>Sohbet</StudentSubTitle>
+        <StudentSubActions>
+          <StudentSubLink to="/app/student/denemeler">Denemeler</StudentSubLink>
+          <StudentSubLink to="/app/student">← Panele dön</StudentSubLink>
+        </StudentSubActions>
+      </StudentSubTopBar>
 
-      <StudentChatBody>
-        <StudentChatFrame>
+      <StudentPageBody>
+        <StudentPageFrame>
           <ContentSub>Koçunla birebir mesajlaş. Metin, görsel, belge ve ses desteklenir.</ContentSub>
           {error ? <ErrorText>{error}</ErrorText> : null}
 
@@ -726,8 +724,8 @@ export function StudentChatPage() {
               </Composer>
             </ComposerWrap>
           </ChatPanel>
-        </StudentChatFrame>
-      </StudentChatBody>
-    </PreviewShell>
+        </StudentPageFrame>
+      </StudentPageBody>
+    </StudentShell>
   );
 }

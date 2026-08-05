@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
   applyDailyTaskChange,
@@ -16,16 +16,25 @@ import { useAppAuth } from '../AppAuthContext';
 import { DayAdminNote } from '../components/DayAdminNote';
 import { MeetingPanel } from '../components/MeetingPanel';
 import { SubmissionForm } from '../components/SubmissionForm';
+import {
+  StudentContain,
+  StudentHomeLogout,
+  StudentHomeNav,
+  StudentHomeNavLink,
+  StudentHomeTitle,
+  StudentHomeTopBar,
+  StudentPageBody,
+  StudentPageFrame,
+  StudentShell,
+} from '../components/StudentShell';
 import { TaskList } from '../components/TaskList';
 import { preview as t } from '../preview/adminPreviewTheme';
 import {
-  ChatGlowButton,
   ContentCard,
   ContentTitle,
   ErrorText,
   LoadingText,
   PreviewDaySlider,
-  PreviewShell,
 } from '../preview/AdminPreviewUi';
 import type { DailySubmission, StudentMeeting, StudentTask } from '../types';
 import { buildWeekDays, formatDayHeading, toDateKey } from '../utils/dates';
@@ -56,108 +65,36 @@ const toneSoft: Record<ProgressTone, string> = {
   muted: 'rgba(148, 163, 184, 0.12)',
 };
 
-const StudentTopBar = styled.header`
-  width: 100%;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 52px;
-  padding: 10px 20px;
-  border-bottom: 1px solid ${t.border};
-  background: ${t.panel};
-
-  @media (min-width: 640px) {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 28px;
-  }
-`;
-
-const StudentTopTitle = styled.h1`
-  margin: 0;
-  min-width: 0;
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: ${t.text};
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  justify-self: start;
-`;
-
-const LogoutButton = styled.button`
-  flex-shrink: 0;
-  padding: 7px 12px;
-  border-radius: 999px;
-  border: 1px solid ${t.borderStrong};
-  background: ${t.panel2};
-  color: ${t.muted};
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 700;
-  cursor: pointer;
-  justify-self: end;
-
-  &:hover {
-    border-color: rgba(96, 165, 250, 0.5);
-    color: ${t.text};
-  }
-`;
-
-const StudentChatButton = styled(ChatGlowButton)`
-  padding: 7px 12px;
-  font-size: 0.78rem;
-  flex-shrink: 0;
-  justify-self: center;
-`;
-
-const StudentBody = styled.div`
-  width: 100%;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-`;
-
-const StudentFrame = styled.div`
-  width: 100%;
-  max-width: 720px;
-  box-sizing: border-box;
-  padding: 20px 16px 56px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-
-  @media (min-width: 640px) {
-    padding: 24px 24px 64px;
-  }
-`;
-
 const IdentityCard = styled.section`
-  padding: 20px 18px 18px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 14px;
   border-radius: ${t.radiusLg};
   border: 1px solid ${t.border};
   background: ${t.panel};
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+
+  @media (min-width: 640px) {
+    padding: 18px;
+    gap: 14px;
+  }
 `;
 
 const IdentityDate = styled.h2`
   margin: 0;
-  font-size: 1.45rem;
+  font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: -0.03em;
-  line-height: 1.2;
+  line-height: 1.25;
   color: ${t.text};
+  overflow-wrap: anywhere;
 
   @media (min-width: 640px) {
-    font-size: 1.65rem;
+    font-size: 1.55rem;
   }
 `;
 
@@ -177,11 +114,15 @@ const ProgressLabel = styled.span`
 `;
 
 const ProgressValue = styled.span<{ $tone: ProgressTone }>`
-  font-size: 1.75rem;
+  font-size: 1.45rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1;
   color: ${({ $tone }) => toneColor[$tone]};
+
+  @media (min-width: 640px) {
+    font-size: 1.75rem;
+  }
 `;
 
 const ProgressTrack = styled.div`
@@ -204,12 +145,17 @@ const SectionStack = styled.div`
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-width: 0;
+  width: 100%;
 `;
 
 const SectionGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr;
   gap: 14px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 
   @media (min-width: 720px) {
     grid-template-columns: 1fr 1fr;
@@ -304,11 +250,11 @@ export function StudentDashboardPage() {
 
   if (isLoading) {
     return (
-      <PreviewShell>
-        <StudentFrame>
+      <StudentShell>
+        <StudentPageFrame>
           <LoadingText>Yükleniyor...</LoadingText>
-        </StudentFrame>
-      </PreviewShell>
+        </StudentPageFrame>
+      </StudentShell>
     );
   }
 
@@ -353,24 +299,25 @@ export function StudentDashboardPage() {
   };
 
   return (
-    <PreviewShell>
-      <StudentTopBar>
-        <StudentTopTitle>{user.displayName}</StudentTopTitle>
-        <StudentChatButton as={Link} to="/app/student/chat">
-          Sohbet
-        </StudentChatButton>
-        <LogoutButton
+    <StudentShell>
+      <StudentHomeTopBar>
+        <StudentHomeTitle>{user.displayName}</StudentHomeTitle>
+        <StudentHomeNav>
+          <StudentHomeNavLink to="/app/student/chat">Sohbet</StudentHomeNavLink>
+          <StudentHomeNavLink to="/app/student/denemeler">Denemeler</StudentHomeNavLink>
+        </StudentHomeNav>
+        <StudentHomeLogout
           type="button"
           onClick={() => {
             void logout();
           }}
         >
           Çıkış Yap
-        </LogoutButton>
-      </StudentTopBar>
+        </StudentHomeLogout>
+      </StudentHomeTopBar>
 
-      <StudentBody>
-        <StudentFrame>
+      <StudentPageBody>
+        <StudentPageFrame>
           <IdentityCard>
             <IdentityDate>{formatDayHeading(selectedDate)}</IdentityDate>
             <ProgressRow>
@@ -382,11 +329,13 @@ export function StudentDashboardPage() {
             </ProgressTrack>
           </IdentityCard>
 
-          <PreviewDaySlider
-            days={weekDays}
-            selectedIndex={selectedIndex}
-            onSelect={setSelectedIndex}
-          />
+          <StudentContain>
+            <PreviewDaySlider
+              days={weekDays}
+              selectedIndex={selectedIndex}
+              onSelect={setSelectedIndex}
+            />
+          </StudentContain>
 
           {error ? <ErrorText>{error}</ErrorText> : null}
           {isPageLoading ? <LoadingText>Yükleniyor...</LoadingText> : null}
@@ -418,8 +367,8 @@ export function StudentDashboardPage() {
               ) : null}
             </SectionStack>
           </SectionGrid>
-        </StudentFrame>
-      </StudentBody>
-    </PreviewShell>
+        </StudentPageFrame>
+      </StudentPageBody>
+    </StudentShell>
   );
 }

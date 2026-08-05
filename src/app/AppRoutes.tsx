@@ -6,6 +6,7 @@ import { AdminShowcasePage } from './pages/AdminShowcasePage';
 import { AppLoginPage } from './pages/AppLoginPage';
 import { StudentChatPage } from './pages/StudentChatPage';
 import { StudentDashboardPage } from './pages/StudentDashboardPage';
+import { StudentDenemesPage } from './pages/StudentDenemesPage';
 
 export function AppRoutes() {
   return (
@@ -14,6 +15,7 @@ export function AppRoutes() {
         <Route index element={<AppLoginPage />} />
         <Route path="student" element={<StudentDashboardPage />} />
         <Route path="student/chat" element={<StudentChatPage />} />
+        <Route path="student/denemeler" element={<StudentDenemesPage />} />
         <Route path="admin" element={<AdminPreviewPage />} />
         <Route path="admin/preview" element={<Navigate to="/app/admin" replace />} />
         <Route path="admin/showcase" element={<AdminShowcasePage />} />

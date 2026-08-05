@@ -5,6 +5,8 @@ import {
   type DbDailyAdminNote,
   type DbDailySubmission,
   type DbDailyTask,
+  type DbDenemeEntry,
+  type DbDenemeLeafScore,
   type DbProfile,
   type DbStudentMeeting,
 } from '../../lib/supabase';
@@ -13,6 +15,9 @@ import {
   type ChatMessage,
   type ChatThread,
   type DailySubmission,
+  type DenemeEntry,
+  type DenemeEntryInput,
+  type DenemeLeafScore,
   type StudentMeeting,
   type StudentSummary,
   type StudentTask,
@@ -274,6 +279,172 @@ export async function fetchOrgMeetingsForRange(
   }
 
   return grouped;
+}
+
+function parseDenemeScores(raw: unknown): DenemeLeafScore[] {
+  if (!Array.isArray(raw)) return [];
+  const scores: DenemeLeafScore[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Partial<DbDenemeLeafScore>;
+    if (typeof row.leafId !== 'string') continue;
+    const correct = typeof row.correct === 'number' ? row.correct : Number(row.correct);
+    const wrong = typeof row.wrong === 'number' ? row.wrong : Number(row.wrong);
+    if (!Number.isFinite(correct) || !Number.isFinite(wrong)) continue;
+    scores.push({
+      leafId: row.leafId,
+      correct: Math.max(0, Math.trunc(correct)),
+      wrong: Math.max(0, Math.trunc(wrong)),
+    });
+  }
+  return scores;
+}
+
+function parseDenemeTopics(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function mapDenemeEntry(row: DbDenemeEntry): DenemeEntry {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    denemeDate: row.deneme_date,
+    name: row.name,
+    duration: row.duration ?? '',
+    typeId: row.type_id,
+    scores: parseDenemeScores(row.scores),
+    topics: parseDenemeTopics(row.topics),
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** Load all deneme entries for one student, newest date first. */
+export async function fetchDenemesForStudent(studentId: string): Promise<DenemeEntry[]> {
+  const { data, error } = await supabase
+    .from('deneme_entries')
+    .select(
+      'id, organization_id, student_id, deneme_date, name, duration, type_id, scores, topics, created_by, created_at, updated_at',
+    )
+    .eq('student_id', studentId)
+    .order('deneme_date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => mapDenemeEntry(row as DbDenemeEntry));
+}
+
+/** Load deneme entries for one student in a date range, grouped by date. */
+export async function fetchDenemesForRange(
+  studentId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<Record<string, DenemeEntry[]>> {
+  const { data, error } = await supabase
+    .from('deneme_entries')
+    .select(
+      'id, organization_id, student_id, deneme_date, name, duration, type_id, scores, topics, created_by, created_at, updated_at',
+    )
+    .eq('student_id', studentId)
+    .gte('deneme_date', fromDate)
+    .lte('deneme_date', toDate)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+
+  const grouped: Record<string, DenemeEntry[]> = {};
+  for (const row of data ?? []) {
+    const entry = mapDenemeEntry(row as DbDenemeEntry);
+    grouped[entry.denemeDate] ??= [];
+    grouped[entry.denemeDate].push(entry);
+  }
+  return grouped;
+}
+
+/** Admin: load deneme entries for all students in a date range. */
+export async function fetchOrgDenemesForRange(
+  fromDate: string,
+  toDate: string,
+): Promise<Record<string, Record<string, DenemeEntry[]>>> {
+  const { data, error } = await supabase
+    .from('deneme_entries')
+    .select(
+      'id, organization_id, student_id, deneme_date, name, duration, type_id, scores, topics, created_by, created_at, updated_at',
+    )
+    .gte('deneme_date', fromDate)
+    .lte('deneme_date', toDate)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+
+  const grouped: Record<string, Record<string, DenemeEntry[]>> = {};
+  for (const row of data ?? []) {
+    const entry = mapDenemeEntry(row as DbDenemeEntry);
+    grouped[entry.studentId] ??= {};
+    grouped[entry.studentId][entry.denemeDate] ??= [];
+    grouped[entry.studentId][entry.denemeDate].push(entry);
+  }
+  return grouped;
+}
+
+export async function createDenemeEntry(
+  studentId: string,
+  input: DenemeEntryInput,
+  createdBy: string,
+): Promise<DenemeEntry> {
+  const { data, error } = await supabase
+    .from('deneme_entries')
+    .insert({
+      student_id: studentId,
+      deneme_date: input.denemeDate,
+      name: input.name.trim(),
+      duration: input.duration.trim(),
+      type_id: input.typeId,
+      scores: input.scores,
+      topics: input.topics.map((t) => t.trim()).filter(Boolean),
+      created_by: createdBy,
+    })
+    .select(
+      'id, organization_id, student_id, deneme_date, name, duration, type_id, scores, topics, created_by, created_at, updated_at',
+    )
+    .single();
+
+  if (error) throw error;
+  return mapDenemeEntry(data as DbDenemeEntry);
+}
+
+export async function updateDenemeEntry(
+  denemeId: string,
+  input: DenemeEntryInput,
+): Promise<DenemeEntry> {
+  const { data, error } = await supabase
+    .from('deneme_entries')
+    .update({
+      deneme_date: input.denemeDate,
+      name: input.name.trim(),
+      duration: input.duration.trim(),
+      type_id: input.typeId,
+      scores: input.scores,
+      topics: input.topics.map((t) => t.trim()).filter(Boolean),
+    })
+    .eq('id', denemeId)
+    .select(
+      'id, organization_id, student_id, deneme_date, name, duration, type_id, scores, topics, created_by, created_at, updated_at',
+    )
+    .single();
+
+  if (error) throw error;
+  return mapDenemeEntry(data as DbDenemeEntry);
+}
+
+export async function deleteDenemeEntry(denemeId: string): Promise<void> {
+  const { error } = await supabase.from('deneme_entries').delete().eq('id', denemeId);
+  if (error) throw error;
 }
 
 export async function fetchSubmissionsForRange(

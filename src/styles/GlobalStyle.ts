@@ -7,6 +7,14 @@ export const GlobalStyle = createGlobalStyle`
     box-sizing: border-box;
   }
 
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
   body {
     margin: 0;
     font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
