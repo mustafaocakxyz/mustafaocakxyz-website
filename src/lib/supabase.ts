@@ -83,6 +83,7 @@ export type DbDenemeLeafScore = {
   leafId: string;
   correct: number;
   wrong: number;
+  empty?: number;
 };
 
 export type DbDenemeEntry = {

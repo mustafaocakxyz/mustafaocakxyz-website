@@ -323,10 +323,21 @@ function parseDenemeScores(raw: unknown): DenemeLeafScore[] {
     const correct = typeof row.correct === 'number' ? row.correct : Number(row.correct);
     const wrong = typeof row.wrong === 'number' ? row.wrong : Number(row.wrong);
     if (!Number.isFinite(correct) || !Number.isFinite(wrong)) continue;
+    const emptyRaw =
+      row.empty === undefined || row.empty === null
+        ? undefined
+        : typeof row.empty === 'number'
+          ? row.empty
+          : Number(row.empty);
+    const empty =
+      emptyRaw !== undefined && Number.isFinite(emptyRaw)
+        ? Math.max(0, Math.trunc(emptyRaw))
+        : undefined;
     scores.push({
       leafId: row.leafId,
       correct: Math.max(0, Math.trunc(correct)),
       wrong: Math.max(0, Math.trunc(wrong)),
+      ...(empty !== undefined ? { empty } : {}),
     });
   }
   return scores;

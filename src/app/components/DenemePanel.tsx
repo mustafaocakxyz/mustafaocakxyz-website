@@ -8,7 +8,8 @@ import {
   formatDenemeNet,
   getDenemeType,
   isDenemeTypeId,
-  leafEmptyCount,
+  isFlexibleLeaf,
+  resolveLeafEmpty,
   validateDenemeScores,
   type DenemeLeafDef,
   type DenemeTypeId,
@@ -64,6 +65,14 @@ function toFormState(entry?: DenemeEntry | null): FormState {
     const def = getDenemeType(entry.typeId)!;
     const scores = def.leaves.map((leaf) => {
       const existing = entry.scores.find((s) => s.leafId === leaf.id);
+      if (isFlexibleLeaf(leaf)) {
+        return {
+          leafId: leaf.id,
+          correct: existing?.correct ?? 0,
+          wrong: existing?.wrong ?? 0,
+          empty: existing?.empty ?? 0,
+        };
+      }
       return {
         leafId: leaf.id,
         correct: existing?.correct ?? 0,
@@ -156,7 +165,7 @@ function aggregateGroupScores(
     const score = scores.find((s) => s.leafId === leaf.id);
     const c = score?.correct ?? 0;
     const w = score?.wrong ?? 0;
-    const e = leafEmptyCount(leaf.questionCount, c, w);
+    const e = resolveLeafEmpty(leaf, score);
     correct += c;
     wrong += w;
     empty += e;
@@ -257,15 +266,19 @@ export function DenemePanel({ entries, onCreate, onUpdate, onDelete }: DenemePan
     }));
   };
 
-  const setScore = (leafId: string, field: 'correct' | 'wrong', raw: string) => {
+  const setScore = (leafId: string, field: 'correct' | 'wrong' | 'empty', raw: string) => {
     const parsed = raw === '' ? 0 : Number(raw);
     const value = Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
     setForm((prev) => {
       const def = getDenemeType(prev.typeId);
       const leaf = def?.leaves.find((l) => l.id === leafId);
-      const max = leaf?.questionCount ?? 0;
       const scores = prev.scores.map((s) => {
         if (s.leafId !== leafId) return s;
+        if (!leaf || isFlexibleLeaf(leaf)) {
+          return { ...s, [field]: value };
+        }
+        if (field === 'empty') return s;
+        const max = leaf.questionCount ?? 0;
         const next = { ...s, [field]: value };
         if (next.correct + next.wrong > max) {
           if (field === 'correct') next.wrong = Math.max(0, max - next.correct);
@@ -416,12 +429,15 @@ export function DenemePanel({ entries, onCreate, onUpdate, onDelete }: DenemePan
               {typeDef.leaves.map((leaf, index) => {
                 const prevGroup = index > 0 ? typeDef.leaves[index - 1]?.group : undefined;
                 const showGroup = leaf.group && leaf.group !== prevGroup;
+                const flexible = isFlexibleLeaf(leaf);
                 const score = form.scores.find((s) => s.leafId === leaf.id) ?? {
                   leafId: leaf.id,
                   correct: 0,
                   wrong: 0,
+                  empty: flexible ? 0 : undefined,
                 };
-                const empty = leafEmptyCount(leaf.questionCount, score.correct, score.wrong);
+                const empty = resolveLeafEmpty(leaf, score);
+                const total = score.correct + score.wrong + empty;
                 return (
                   <div key={`${leaf.group ?? ''}-${leaf.id}`}>
                     {showGroup ? <GroupLabel>{leaf.group}</GroupLabel> : null}
@@ -429,7 +445,9 @@ export function DenemePanel({ entries, onCreate, onUpdate, onDelete }: DenemePan
                       <LeafMeta>
                         <strong>{leaf.label}</strong>
                         <span>
-                          {leaf.questionCount} soru · boş {empty}
+                          {flexible
+                            ? `${total} soru (D+Y+B)`
+                            : `${leaf.questionCount} soru · boş ${empty}`}
                         </span>
                       </LeafMeta>
                       <ScoreInputs>
@@ -438,7 +456,7 @@ export function DenemePanel({ entries, onCreate, onUpdate, onDelete }: DenemePan
                           <MiniInput
                             type="number"
                             min={0}
-                            max={leaf.questionCount}
+                            max={flexible ? undefined : leaf.questionCount}
                             value={score.correct}
                             onChange={(e) => setScore(leaf.id, 'correct', e.target.value)}
                           />
@@ -448,11 +466,22 @@ export function DenemePanel({ entries, onCreate, onUpdate, onDelete }: DenemePan
                           <MiniInput
                             type="number"
                             min={0}
-                            max={leaf.questionCount}
+                            max={flexible ? undefined : leaf.questionCount}
                             value={score.wrong}
                             onChange={(e) => setScore(leaf.id, 'wrong', e.target.value)}
                           />
                         </MiniField>
+                        {flexible ? (
+                          <MiniField>
+                            B
+                            <MiniInput
+                              type="number"
+                              min={0}
+                              value={score.empty ?? 0}
+                              onChange={(e) => setScore(leaf.id, 'empty', e.target.value)}
+                            />
+                          </MiniField>
+                        ) : null}
                       </ScoreInputs>
                     </LeafRow>
                   </div>
@@ -598,7 +627,7 @@ export function DenemePanel({ entries, onCreate, onUpdate, onDelete }: DenemePan
                             const score = entry.scores.find((s) => s.leafId === leaf.id);
                             const correct = score?.correct ?? 0;
                             const wrong = score?.wrong ?? 0;
-                            const empty = leafEmptyCount(leaf.questionCount, correct, wrong);
+                            const empty = resolveLeafEmpty(leaf, score);
                             return (
                               <BigScoreRow>
                                 <BigScoreBox $tone="correct">
@@ -668,11 +697,7 @@ export function DenemePanel({ entries, onCreate, onUpdate, onDelete }: DenemePan
                                           );
                                           const correct = score?.correct ?? 0;
                                           const wrong = score?.wrong ?? 0;
-                                          const empty = leafEmptyCount(
-                                            leaf.questionCount,
-                                            correct,
-                                            wrong,
-                                          );
+                                          const empty = resolveLeafEmpty(leaf, score);
                                           return (
                                             <GenelLeafRow key={`${group.title}-${leaf.id}`}>
                                               <GenelLeafName>{leaf.label}</GenelLeafName>
@@ -703,11 +728,7 @@ export function DenemePanel({ entries, onCreate, onUpdate, onDelete }: DenemePan
                                     const score = entry.scores.find((s) => s.leafId === leaf.id);
                                     const correct = score?.correct ?? 0;
                                     const wrong = score?.wrong ?? 0;
-                                    const empty = leafEmptyCount(
-                                      leaf.questionCount,
-                                      correct,
-                                      wrong,
-                                    );
+                                    const empty = resolveLeafEmpty(leaf, score);
                                     return (
                                       <LeafScoreCard
                                         key={`${group.title}-${leaf.id}`}

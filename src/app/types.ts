@@ -63,6 +63,8 @@ export type DenemeLeafScore = {
   leafId: string;
   correct: number;
   wrong: number;
+  /** Explicit empty for flexible deneme leaves. */
+  empty?: number;
 };
 
 export type DenemeEntry = {
