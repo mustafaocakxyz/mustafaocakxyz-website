@@ -361,6 +361,7 @@ export function AdminPreviewPage() {
   const weekCacheRef = useRef<Map<string, StudentWeekSnapshot>>(new Map());
   const skipRevalidateOnceRef = useRef(false);
   const extraDayCacheRef = useRef<Set<string>>(new Set());
+  const bootstrappedKeyRef = useRef<string | null>(null);
 
   const [dayOffsetStart, setDayOffsetStart] = useState(-1 - ADMIN_DAY_PAD);
   const [dayOffsetEnd, setDayOffsetEnd] = useState(5 + ADMIN_DAY_PAD);
@@ -482,7 +483,13 @@ export function AdminPreviewPage() {
   }, [weekFrom, weekTo]);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user || user.role !== 'admin') {
+      if (!user) bootstrappedKeyRef.current = null;
+      return;
+    }
+
+    const bootKey = `${user.id}|${weekFrom}|${weekTo}|${todayKey}`;
+    if (bootstrappedKeyRef.current === bootKey) return;
 
     let isMounted = true;
     setIsBootstrapping(true);
@@ -552,6 +559,7 @@ export function AdminPreviewPage() {
         }
 
         bump(100);
+        bootstrappedKeyRef.current = bootKey;
       } catch {
         if (isMounted) setError('Admin paneli yüklenemedi.');
       } finally {

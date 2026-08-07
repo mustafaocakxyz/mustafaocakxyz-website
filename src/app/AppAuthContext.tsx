@@ -25,6 +25,18 @@ async function loadAppUser(userId: string): Promise<AppUser | null> {
   return profile ? mapProfileToAppUser(profile) : null;
 }
 
+function appUsersEqual(a: AppUser | null, b: AppUser | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.id === b.id &&
+    a.role === b.role &&
+    a.displayName === b.displayName &&
+    a.loginUsername === b.loginUsername &&
+    a.organizationId === b.organizationId
+  );
+}
+
 export function AppAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,8 +58,12 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
 
     void init();
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
+
+      // Token refresh on Chrome focus/resume must not rebuild app user state
+      // (that remounts admin bootstrap and wipes UI position).
+      if (event === 'TOKEN_REFRESHED') return;
 
       if (!session?.user) {
         setUser(null);
@@ -55,7 +71,8 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
       }
 
       const appUser = await loadAppUser(session.user.id);
-      if (isMounted) setUser(appUser);
+      if (!isMounted) return;
+      setUser((current) => (appUsersEqual(current, appUser) ? current : appUser));
     });
 
     return () => {
