@@ -1,13 +1,22 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, NotebookPen, Pencil, Plus, Trash2, Video, X } from 'lucide-react';
+import { Check, Link2, NotebookPen, Pencil, Plus, Trash2, Video, X } from 'lucide-react';
 import styled from 'styled-components';
+import {
+  resolveTopicLinkLabel,
+  TaskTopicLinkPicker,
+  topicLinkKey,
+} from '../components/TaskTopicLinkPicker';
 import {
   formatHourOptionLabel,
   HOUR_TIME_OPTIONS,
   MINUTE_TIME_OPTIONS,
+  type CurriculumCatalog,
   type DailySubmission,
+  type MaterialTopicProgress,
   type StudentMeeting,
   type StudentTask,
+  type SubjectTopicProgress,
+  type TaskTopicLink,
 } from '../types';
 import {
   buildUpcomingDays,
@@ -29,15 +38,67 @@ const TaskStack = styled.div`
   gap: 8px;
 `;
 
-const TaskRow = styled.div<{ $completed: boolean }>`
+const TaskItem = styled.div`
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   padding: 12px 14px;
   border-radius: ${t.radiusMd};
   border: 1px solid ${t.border};
   background: ${t.panel2};
+`;
+
+const TaskRow = styled.div<{ $completed: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 10px;
   opacity: ${({ $completed }) => ($completed ? 0.72 : 1)};
+`;
+
+const LinkChipRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-left: 32px;
+`;
+
+const LinkChip = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid ${t.border};
+  background: rgba(15, 23, 42, 0.55);
+  color: ${t.muted};
+  font-size: 0.72rem;
+  font-weight: 700;
+`;
+
+const LinkChipText = styled.span`
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const LinkChipRemove = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: ${t.mutedSoft};
+  cursor: pointer;
+
+  &:hover {
+    color: ${t.text};
+  }
 `;
 
 const StatusIndicator = styled.span<{ $checked: boolean }>`
@@ -129,6 +190,7 @@ const IconButton = styled.button<{ $danger?: boolean; $primary?: boolean }>`
 const AddRow = styled.div`
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
 
   @media (max-width: 640px) {
     flex-direction: column;
@@ -137,6 +199,7 @@ const AddRow = styled.div`
 
 const AddInput = styled.input`
   flex: 1;
+  min-width: 180px;
   padding: 12px 14px;
   border-radius: ${t.radiusMd};
   border: 1px solid ${t.border};
@@ -444,20 +507,36 @@ const DayNoteRail = styled.aside<{ $top: number | null }>`
 
 const TASKS_CARD_ID = 'preview-admin-tasks-card';
 
+type PickerTarget = 'draft' | string;
+
 export function PreviewTasksSection({
   tasks,
+  catalog,
+  enrolledSubjectIds,
+  enrolledMaterialIds,
+  subjectProgress,
+  materialProgress,
   onAdd,
   onEdit,
   onDelete,
+  onUpdateTopicLinks,
 }: {
   tasks: StudentTask[];
-  onAdd: (label: string) => void;
+  catalog: CurriculumCatalog;
+  enrolledSubjectIds: string[];
+  enrolledMaterialIds: string[];
+  subjectProgress: SubjectTopicProgress[];
+  materialProgress: MaterialTopicProgress[];
+  onAdd: (label: string, topicLinks: TaskTopicLink[]) => void;
   onEdit: (taskId: string, label: string) => void;
   onDelete: (taskId: string) => void;
+  onUpdateTopicLinks: (taskId: string, topicLinks: TaskTopicLink[]) => void;
 }) {
   const [newTaskLabel, setNewTaskLabel] = useState('');
+  const [draftLinks, setDraftLinks] = useState<TaskTopicLink[]>([]);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState('');
+  const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
 
   const startEditing = (task: StudentTask) => {
     setEditingTaskId(task.id);
@@ -480,8 +559,47 @@ export function PreviewTasksSection({
   const handleAdd = () => {
     const trimmed = newTaskLabel.trim();
     if (!trimmed) return;
-    onAdd(trimmed);
+    onAdd(trimmed, draftLinks);
     setNewTaskLabel('');
+    setDraftLinks([]);
+  };
+
+  const pickerInitialLinks =
+    pickerTarget === 'draft'
+      ? draftLinks
+      : pickerTarget
+        ? (tasks.find((task) => task.id === pickerTarget)?.topicLinks ?? [])
+        : [];
+
+  const renderChips = (
+    links: TaskTopicLink[],
+    onRemove?: (link: TaskTopicLink) => void,
+  ) => {
+    if (links.length === 0) return null;
+    return (
+      <LinkChipRow>
+        {links.map((link) => {
+          const resolved = resolveTopicLinkLabel(catalog, link);
+          const label = resolved
+            ? `${resolved.parent} · ${resolved.topic}`
+            : link.topicId;
+          return (
+            <LinkChip key={topicLinkKey(link)} title={label}>
+              <LinkChipText>{label}</LinkChipText>
+              {onRemove ? (
+                <LinkChipRemove
+                  type="button"
+                  aria-label="Bağlantıyı kaldır"
+                  onClick={() => onRemove(link)}
+                >
+                  <X size={12} />
+                </LinkChipRemove>
+              ) : null}
+            </LinkChip>
+          );
+        })}
+      </LinkChipRow>
+    );
   };
 
   return (
@@ -491,58 +609,85 @@ export function PreviewTasksSection({
         <TaskStack>
           {tasks.map((task) => {
             const isEditing = editingTaskId === task.id;
+            const links = task.topicLinks ?? [];
             return (
-              <TaskRow key={task.id} $completed={task.completed}>
-                <StatusIndicator $checked={task.completed}>
-                  {task.completed ? <Check size={14} strokeWidth={3} /> : null}
-                </StatusIndicator>
-                {isEditing ? (
-                  <TaskInput
-                    value={editingLabel}
-                    autoFocus
-                    onChange={(event) => setEditingLabel(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') saveEditing();
-                      if (event.key === 'Escape') cancelEditing();
-                    }}
-                  />
-                ) : (
-                  <>
-                    <TaskLabel $completed={task.completed}>{task.label}</TaskLabel>
-                    {task.durationLabel ? (
-                      <DurationPill>{task.durationLabel}</DurationPill>
-                    ) : null}
-                  </>
+              <TaskItem key={task.id}>
+                <TaskRow $completed={task.completed}>
+                  <StatusIndicator $checked={task.completed}>
+                    {task.completed ? <Check size={14} strokeWidth={3} /> : null}
+                  </StatusIndicator>
+                  {isEditing ? (
+                    <TaskInput
+                      value={editingLabel}
+                      autoFocus
+                      onChange={(event) => setEditingLabel(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') saveEditing();
+                        if (event.key === 'Escape') cancelEditing();
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <TaskLabel $completed={task.completed}>{task.label}</TaskLabel>
+                      {task.durationLabel ? (
+                        <DurationPill>{task.durationLabel}</DurationPill>
+                      ) : null}
+                    </>
+                  )}
+                  {isEditing ? (
+                    <>
+                      <IconButton
+                        type="button"
+                        aria-label="Konu bağla"
+                        title="Konu bağla"
+                        $primary
+                        onClick={() => setPickerTarget(task.id)}
+                      >
+                        <Link2 size={15} />
+                      </IconButton>
+                      <IconButton type="button" aria-label="Kaydet" $primary onClick={saveEditing}>
+                        <Check size={15} />
+                      </IconButton>
+                      <IconButton type="button" aria-label="İptal" onClick={cancelEditing}>
+                        <X size={15} />
+                      </IconButton>
+                    </>
+                  ) : (
+                    <>
+                      <IconButton
+                        type="button"
+                        aria-label="Konu bağla"
+                        title="Konu bağla"
+                        onClick={() => setPickerTarget(task.id)}
+                      >
+                        <Link2 size={15} />
+                        {links.length > 0 ? <span>{links.length}</span> : null}
+                      </IconButton>
+                      <IconButton
+                        type="button"
+                        aria-label="Düzenle"
+                        onClick={() => startEditing(task)}
+                      >
+                        <Pencil size={15} />
+                      </IconButton>
+                      <IconButton
+                        type="button"
+                        aria-label="Sil"
+                        $danger
+                        onClick={() => onDelete(task.id)}
+                      >
+                        <Trash2 size={15} />
+                      </IconButton>
+                    </>
+                  )}
+                </TaskRow>
+                {renderChips(links, (link) =>
+                  onUpdateTopicLinks(
+                    task.id,
+                    links.filter((row) => topicLinkKey(row) !== topicLinkKey(link)),
+                  ),
                 )}
-                {isEditing ? (
-                  <>
-                    <IconButton type="button" aria-label="Kaydet" $primary onClick={saveEditing}>
-                      <Check size={15} />
-                    </IconButton>
-                    <IconButton type="button" aria-label="İptal" onClick={cancelEditing}>
-                      <X size={15} />
-                    </IconButton>
-                  </>
-                ) : (
-                  <>
-                    <IconButton
-                      type="button"
-                      aria-label="Düzenle"
-                      onClick={() => startEditing(task)}
-                    >
-                      <Pencil size={15} />
-                    </IconButton>
-                    <IconButton
-                      type="button"
-                      aria-label="Sil"
-                      $danger
-                      onClick={() => onDelete(task.id)}
-                    >
-                      <Trash2 size={15} />
-                    </IconButton>
-                  </>
-                )}
-              </TaskRow>
+              </TaskItem>
             );
           })}
         </TaskStack>
@@ -559,12 +704,48 @@ export function PreviewTasksSection({
               if (event.key === 'Enter') handleAdd();
             }}
           />
+          <IconButton
+            type="button"
+            aria-label="Konu bağla"
+            title="Konu bağla"
+            $primary
+            onClick={() => setPickerTarget('draft')}
+            style={{ minHeight: 46, height: 46, minWidth: 46 }}
+          >
+            <Link2 size={16} />
+            {draftLinks.length > 0 ? <span>{draftLinks.length}</span> : null}
+          </IconButton>
           <AddButton type="button" onClick={handleAdd}>
             <Plus size={16} />
             Ekle
           </AddButton>
         </AddRow>
+        {renderChips(draftLinks, (link) =>
+          setDraftLinks((current) =>
+            current.filter((row) => topicLinkKey(row) !== topicLinkKey(link)),
+          ),
+        )}
       </NestedCard>
+
+      {pickerTarget ? (
+        <TaskTopicLinkPicker
+          catalog={catalog}
+          enrolledSubjectIds={enrolledSubjectIds}
+          enrolledMaterialIds={enrolledMaterialIds}
+          subjectProgress={subjectProgress}
+          materialProgress={materialProgress}
+          initialLinks={pickerInitialLinks}
+          onClose={() => setPickerTarget(null)}
+          onConfirm={(links) => {
+            if (pickerTarget === 'draft') {
+              setDraftLinks(links);
+            } else {
+              onUpdateTopicLinks(pickerTarget, links);
+            }
+            setPickerTarget(null);
+          }}
+        />
+      ) : null}
     </SectionStack>
   );
 }

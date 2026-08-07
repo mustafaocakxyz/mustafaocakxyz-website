@@ -1,5 +1,6 @@
+import { useEffect, useRef } from 'react';
 import styled, { css } from 'styled-components';
-import { formatDayPill } from '../utils/dates';
+import { formatDayPill, toDateKey } from '../utils/dates';
 import { preview as t } from './adminPreviewTheme';
 
 export const PreviewShell = styled.div`
@@ -81,6 +82,14 @@ export const TopBarButton = styled.button`
     opacity: 0.5;
     cursor: not-allowed;
   }
+`;
+
+export const TopBarIconButton = styled(TopBarButton)`
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  justify-content: center;
+  flex-shrink: 0;
 `;
 
 /** Orange CTA for chat entry in the top bar. */
@@ -714,12 +723,29 @@ export const DaySliderPanel = styled.div`
   background: ${t.panel};
 `;
 
-export const DaySliderRow = styled.div`
+export const DaySliderRow = styled.div<{ $extendable?: boolean }>`
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 8px;
   min-width: 0;
   width: 100%;
+
+  ${({ $extendable }) =>
+    $extendable &&
+    css`
+      display: flex;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding-bottom: 2px;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x proximity;
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+    `}
 
   @media (max-width: 560px) {
     display: flex;
@@ -736,7 +762,7 @@ export const DaySliderRow = styled.div`
   }
 `;
 
-export const DayPill = styled.button<{ $selected: boolean; $isToday: boolean }>`
+export const DayPill = styled.button<{ $selected: boolean; $isToday: boolean; $extendable?: boolean }>`
   width: 100%;
   min-width: 0;
   padding: 10px 6px;
@@ -751,6 +777,16 @@ export const DayPill = styled.button<{ $selected: boolean; $isToday: boolean }>`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+
+  ${({ $extendable }) =>
+    $extendable &&
+    css`
+      flex: 0 0 auto;
+      width: auto;
+      min-width: 86px;
+      padding: 10px 12px;
+      scroll-snap-align: center;
+    `}
 
   @media (max-width: 560px) {
     flex: 0 0 auto;
@@ -781,20 +817,72 @@ export function PreviewDaySlider({
   days,
   selectedIndex,
   onSelect,
+  todayIndex = 1,
+  extendable = false,
+  onNearStart,
+  onNearEnd,
 }: {
   days: Date[];
   selectedIndex: number;
   onSelect: (index: number) => void;
+  todayIndex?: number;
+  extendable?: boolean;
+  onNearStart?: () => void;
+  onNearEnd?: () => void;
 }) {
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const edgeLockRef = useRef(false);
+
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    const selected = row.children[selectedIndex] as HTMLElement | undefined;
+    if (!selected) return;
+    selected.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'center',
+      block: 'nearest',
+    });
+  }, [selectedIndex, days.length, extendable]);
+
+  useEffect(() => {
+    if (!extendable) return;
+    const row = rowRef.current;
+    if (!row || (!onNearStart && !onNearEnd)) return;
+
+    const onScroll = () => {
+      if (edgeLockRef.current) return;
+      const nearStart = row.scrollLeft <= 48;
+      const nearEnd = row.scrollLeft + row.clientWidth >= row.scrollWidth - 48;
+      if (nearStart && onNearStart) {
+        edgeLockRef.current = true;
+        onNearStart();
+        window.setTimeout(() => {
+          edgeLockRef.current = false;
+        }, 400);
+      } else if (nearEnd && onNearEnd) {
+        edgeLockRef.current = true;
+        onNearEnd();
+        window.setTimeout(() => {
+          edgeLockRef.current = false;
+        }, 400);
+      }
+    };
+
+    row.addEventListener('scroll', onScroll, { passive: true });
+    return () => row.removeEventListener('scroll', onScroll);
+  }, [extendable, onNearStart, onNearEnd, days.length]);
+
   return (
     <DaySliderPanel>
-      <DaySliderRow>
+      <DaySliderRow ref={rowRef} $extendable={extendable}>
         {days.map((day, index) => (
           <DayPill
-            key={day.toISOString()}
+            key={toDateKey(day)}
             type="button"
             $selected={index === selectedIndex}
-            $isToday={index === 1}
+            $isToday={index === todayIndex}
+            $extendable={extendable}
             onClick={() => onSelect(index)}
           >
             {formatDayPill(day)}

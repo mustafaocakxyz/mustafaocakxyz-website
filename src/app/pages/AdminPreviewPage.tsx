@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Video } from 'lucide-react';
+import { Download, Settings, Video } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import {
@@ -9,14 +9,18 @@ import {
   deleteDenemeEntry,
   deleteMeeting,
   deleteTask,
+  enrollStudentMaterial,
+  enrollStudentSubject,
   exportOrganizationJson,
   exportStudentJson,
+  fetchCurriculumCatalog,
   fetchDenemesForStudent,
   fetchOrgAdminNotesForRange,
   fetchOrgMeetingsForRange,
   fetchOrgSubmissionsForRange,
   fetchOrgTasksForDates,
   fetchOrgTasksForRange,
+  fetchStudentCurriculumState,
   fetchStudentIdsWithMeetingsInRange,
   fetchStudents,
   fetchSubmissionsForRange,
@@ -25,30 +29,41 @@ import {
   fetchMeetingsForRange,
   getSubmissionForDate,
   subscribeDailyTasks,
+  unenrollStudentMaterial,
+  unenrollStudentSubject,
   updateDenemeEntry,
   updateTaskLabel,
+  updateTaskTopicLinks,
   upsertAdminNote,
+  upsertMaterialTopicProgress,
   upsertMeeting,
+  upsertSubjectTopicProgress,
 } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
 import { DenemePanel } from '../components/DenemePanel';
+import { KonuMateryalPanel } from '../components/KonuMateryalPanel';
 import type {
+  CurriculumCatalog,
   DailySubmission,
   DenemeEntry,
   DenemeEntryInput,
+  StudentCurriculumState,
   StudentMeeting,
   StudentSummary,
   StudentTask,
+  TaskTopicLink,
+  TopicStatus,
 } from '../types';
 import {
   addDaysToDateKey,
+  buildDaysFromOffsets,
   buildWeekDays,
   startOfDay,
   toDateKey,
 } from '../utils/dates';
 import { downloadJson } from '../utils/download';
 import { computeCompletionPercent } from '../utils/taskLabel';
-import { CoachNotesSection, KonuMateryalSection } from '../preview/AdminPreviewSections';
+import { CoachNotesSection } from '../preview/AdminPreviewSections';
 import {
   PreviewDayNoteRail,
   PreviewFormSection,
@@ -96,13 +111,16 @@ import {
   StudentName,
   ChatGlowButton,
   TopBarActions,
-  TopBarButton,
+  TopBarIconButton,
   TopBarEnd,
   TopBarTitle,
 } from '../preview/AdminPreviewUi';
 import { preview as t } from '../preview/adminPreviewTheme';
 
-const TODAY_INDEX = 1;
+/** Default week still yesterday→+5; slider starts padded so admin can scroll out. */
+const ADMIN_DAY_PAD = 14;
+const ADMIN_DAY_CHUNK = 14;
+const ADMIN_TODAY_INDEX = ADMIN_DAY_PAD + 1;
 
 type SectionId = 'tasks' | 'form' | 'topics' | 'exams' | 'notes';
 
@@ -334,7 +352,7 @@ const StudentExportButton = styled.button`
 `;
 
 export function AdminPreviewPage() {
-  const { user, isLoading, logout } = useAppAuth();
+  const { user, isLoading } = useAppAuth();
   const weekDays = useMemo(() => buildWeekDays(), []);
   const weekFrom = toDateKey(weekDays[0]);
   const weekTo = toDateKey(weekDays[weekDays.length - 1]);
@@ -342,10 +360,19 @@ export function AdminPreviewPage() {
   const meetingAlertToKey = useMemo(() => addDaysToDateKey(todayKey, 2), [todayKey]);
   const weekCacheRef = useRef<Map<string, StudentWeekSnapshot>>(new Map());
   const skipRevalidateOnceRef = useRef(false);
+  const extraDayCacheRef = useRef<Set<string>>(new Set());
+
+  const [dayOffsetStart, setDayOffsetStart] = useState(-1 - ADMIN_DAY_PAD);
+  const [dayOffsetEnd, setDayOffsetEnd] = useState(5 + ADMIN_DAY_PAD);
+  const days = useMemo(
+    () => buildDaysFromOffsets(dayOffsetStart, dayOffsetEnd),
+    [dayOffsetStart, dayOffsetEnd],
+  );
+  const todayDayIndex = -dayOffsetStart;
 
   const [students, setStudents] = useState<StudentSummary[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [selectedDayIndex, setSelectedDayIndex] = useState(TODAY_INDEX);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(ADMIN_TODAY_INDEX);
   const [section, setSection] = useState<SectionId>('tasks');
   const [query, setQuery] = useState('');
   const [filterMissingTomorrow, setFilterMissingTomorrow] = useState(false);
@@ -356,6 +383,13 @@ export function AdminPreviewPage() {
   const [meetingsByDate, setMeetingsByDate] = useState<Record<string, StudentMeeting>>({});
   const [denemes, setDenemes] = useState<DenemeEntry[]>([]);
   const denemeCacheRef = useRef<Map<string, DenemeEntry[]>>(new Map());
+  const [curriculumCatalog, setCurriculumCatalog] = useState<CurriculumCatalog>({
+    subjects: [],
+    materials: [],
+  });
+  const [curriculumByStudent, setCurriculumByStudent] = useState<
+    Record<string, StudentCurriculumState>
+  >({});
   const [studentsWithUpcomingMeeting, setStudentsWithUpcomingMeeting] = useState<Set<string>>(
     () => new Set(),
   );
@@ -457,6 +491,7 @@ export function AdminPreviewPage() {
     weekCacheRef.current.clear();
     denemeCacheRef.current.clear();
     setDenemes([]);
+    setCurriculumByStudent({});
 
     const bump = (value: number) => {
       if (isMounted) setBootProgress((current) => Math.max(current, value));
@@ -464,10 +499,11 @@ export function AdminPreviewPage() {
 
     const bootstrap = async () => {
       try {
-        const rows = await fetchStudents();
+        const [rows, catalog] = await Promise.all([fetchStudents(), fetchCurriculumCatalog()]);
         if (!isMounted) return;
         bump(18);
         setStudents(rows);
+        setCurriculumCatalog(catalog);
 
         const studentIds = rows.map((row) => row.id);
         const advancePerQuery = 16;
@@ -559,6 +595,25 @@ export function AdminPreviewPage() {
       setDenemes([]);
     }
 
+    const ensureCurriculum = async () => {
+      setCurriculumByStudent((current) => {
+        if (current[studentId]) return current;
+        void (async () => {
+          try {
+            const curriculum = await fetchStudentCurriculumState(studentId);
+            if (!isMounted) return;
+            setCurriculumByStudent((prev) =>
+              prev[studentId] ? prev : { ...prev, [studentId]: curriculum },
+            );
+          } catch {
+            if (isMounted) setError('Konu & materyal verileri yüklenemedi.');
+          }
+        })();
+        return current;
+      });
+    };
+    void ensureCurriculum();
+
     if (cached) {
       applyWeekSnapshot(cached);
       syncSelectedStudentStatus(studentId, cached.tasksByDate);
@@ -628,6 +683,74 @@ export function AdminPreviewPage() {
     syncSelectedStudentStatus,
     applyWeekSnapshot,
     writeWeekCache,
+  ]);
+
+  const expandPastDays = useCallback(() => {
+    setDayOffsetStart((current) => current - ADMIN_DAY_CHUNK);
+    setSelectedDayIndex((current) => current + ADMIN_DAY_CHUNK);
+  }, []);
+
+  const expandFutureDays = useCallback(() => {
+    setDayOffsetEnd((current) => current + ADMIN_DAY_CHUNK);
+  }, []);
+
+  useEffect(() => {
+    extraDayCacheRef.current.clear();
+  }, [selectedStudentId]);
+
+  useEffect(() => {
+    if (isBootstrapping || !selectedStudentId) return;
+    const date = days[selectedDayIndex];
+    if (!date) return;
+    const dateKey = toDateKey(date);
+    if (dateKey >= weekFrom && dateKey <= weekTo) return;
+
+    const cacheKey = `${selectedStudentId}|${dateKey}`;
+    if (extraDayCacheRef.current.has(cacheKey)) return;
+    extraDayCacheRef.current.add(cacheKey);
+
+    let isMounted = true;
+    void (async () => {
+      try {
+        const [tasks, submissions, adminNotes, meetings] = await Promise.all([
+          fetchTasksForRange(selectedStudentId, dateKey, dateKey),
+          fetchSubmissionsForRange(selectedStudentId, dateKey, dateKey),
+          fetchAdminNotesForRange(selectedStudentId, dateKey, dateKey),
+          fetchMeetingsForRange(selectedStudentId, dateKey, dateKey),
+        ]);
+        if (!isMounted) return;
+        setTasksByDate((current) => ({
+          ...current,
+          [dateKey]: tasks[dateKey] ?? [],
+        }));
+        setSubmissionsByDate((current) => {
+          if (!submissions[dateKey]) return current;
+          return { ...current, [dateKey]: submissions[dateKey] };
+        });
+        setAdminNotesByDate((current) => {
+          if (adminNotes[dateKey] === undefined) return current;
+          return { ...current, [dateKey]: adminNotes[dateKey] };
+        });
+        setMeetingsByDate((current) => {
+          if (!meetings[dateKey]) return current;
+          return { ...current, [dateKey]: meetings[dateKey] };
+        });
+      } catch {
+        extraDayCacheRef.current.delete(cacheKey);
+        if (isMounted) setError('Gün verileri yüklenemedi.');
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    isBootstrapping,
+    selectedStudentId,
+    selectedDayIndex,
+    days,
+    weekFrom,
+    weekTo,
   ]);
 
   useEffect(() => {
@@ -744,7 +867,7 @@ export function AdminPreviewPage() {
   }
 
   const selectedStudent = students.find((student) => student.id === selectedStudentId);
-  const selectedDate = weekDays[selectedDayIndex];
+  const selectedDate = days[selectedDayIndex] ?? days[todayDayIndex];
   const selectedDateKey = toDateKey(selectedDate);
   const tasks = tasksByDate[selectedDateKey] ?? [];
   const submission = getSubmissionForDate(submissionsByDate, selectedDateKey);
@@ -754,7 +877,7 @@ export function AdminPreviewPage() {
   const showDaySlider = isDayView;
   const showReturnToTasks = !isDayView;
 
-  const handleAddTask = async (label: string) => {
+  const handleAddTask = async (label: string, topicLinks: TaskTopicLink[] = []) => {
     if (!selectedStudent) return;
     try {
       const created = await createTask(
@@ -762,6 +885,7 @@ export function AdminPreviewPage() {
         selectedDateKey,
         label,
         tasks.length,
+        topicLinks,
       );
       setTasksByDate((current) => {
         const next = {
@@ -796,6 +920,25 @@ export function AdminPreviewPage() {
       });
     } catch {
       setError('Görev güncellenemedi.');
+    }
+  };
+
+  const handleUpdateTaskTopicLinks = async (taskId: string, topicLinks: TaskTopicLink[]) => {
+    if (!selectedStudent) return;
+    try {
+      await updateTaskTopicLinks(taskId, topicLinks);
+      setTasksByDate((current) => {
+        const next = {
+          ...current,
+          [selectedDateKey]: (current[selectedDateKey] ?? []).map((task) =>
+            task.id === taskId ? { ...task, topicLinks } : task,
+          ),
+        };
+        patchWeekCacheTasks(selectedStudent.id, next);
+        return next;
+      });
+    } catch {
+      setError('Konu bağlantıları kaydedilemedi.');
     }
   };
 
@@ -902,6 +1045,109 @@ export function AdminPreviewPage() {
     });
   };
 
+  const emptyCurriculum = (): StudentCurriculumState => ({
+    subjectIds: [],
+    materialIds: [],
+    subjectProgress: [],
+    materialProgress: [],
+  });
+
+  const patchCurriculum = (
+    studentId: string,
+    patch: (current: StudentCurriculumState) => StudentCurriculumState,
+  ) => {
+    setCurriculumByStudent((current) => {
+      const base = current[studentId] ?? emptyCurriculum();
+      return { ...current, [studentId]: patch(base) };
+    });
+  };
+
+  const handleEnrollSubject = async (subjectId: string) => {
+    if (!selectedStudent) return;
+    await enrollStudentSubject(selectedStudent.id, subjectId);
+    patchCurriculum(selectedStudent.id, (cur) => ({
+      ...cur,
+      subjectIds: cur.subjectIds.includes(subjectId)
+        ? cur.subjectIds
+        : [...cur.subjectIds, subjectId],
+    }));
+  };
+
+  const handleUnenrollSubject = async (subjectId: string) => {
+    if (!selectedStudent) return;
+    await unenrollStudentSubject(selectedStudent.id, subjectId);
+    patchCurriculum(selectedStudent.id, (cur) => ({
+      ...cur,
+      subjectIds: cur.subjectIds.filter((id) => id !== subjectId),
+    }));
+  };
+
+  const handleEnrollMaterial = async (materialId: string) => {
+    if (!selectedStudent) return;
+    await enrollStudentMaterial(selectedStudent.id, materialId);
+    patchCurriculum(selectedStudent.id, (cur) => ({
+      ...cur,
+      materialIds: cur.materialIds.includes(materialId)
+        ? cur.materialIds
+        : [...cur.materialIds, materialId],
+    }));
+  };
+
+  const handleUnenrollMaterial = async (materialId: string) => {
+    if (!selectedStudent) return;
+    await unenrollStudentMaterial(selectedStudent.id, materialId);
+    patchCurriculum(selectedStudent.id, (cur) => ({
+      ...cur,
+      materialIds: cur.materialIds.filter((id) => id !== materialId),
+    }));
+  };
+
+  const handleUpdateSubjectTopic = async (topicId: string, status: TopicStatus) => {
+    if (!selectedStudent) return;
+    await upsertSubjectTopicProgress(selectedStudent.id, topicId, status);
+    const subjectId =
+      curriculumCatalog.subjects.find((s) => s.topics.some((topic) => topic.id === topicId))?.id ??
+      '';
+    patchCurriculum(selectedStudent.id, (cur) => {
+      const others = cur.subjectProgress.filter((row) => row.topicId !== topicId);
+      return {
+        ...cur,
+        subjectProgress: [...others, { topicId, subjectId, status }],
+      };
+    });
+  };
+
+  const handleUpdateMaterialTopic = async (
+    topicId: string,
+    input: {
+      status: TopicStatus;
+      correctCount: number | null;
+      questionCount: number | null;
+    },
+  ) => {
+    if (!selectedStudent) return;
+    await upsertMaterialTopicProgress(selectedStudent.id, topicId, input);
+    const materialId =
+      curriculumCatalog.materials.find((m) => m.topics.some((topic) => topic.id === topicId))?.id ??
+      '';
+    patchCurriculum(selectedStudent.id, (cur) => {
+      const others = cur.materialProgress.filter((row) => row.topicId !== topicId);
+      return {
+        ...cur,
+        materialProgress: [
+          ...others,
+          {
+            topicId,
+            materialId,
+            status: input.status,
+            correctCount: input.correctCount,
+            questionCount: input.questionCount,
+          },
+        ],
+      };
+    });
+  };
+
   const handleExportStudent = async () => {
     if (!selectedStudent) return;
 
@@ -940,24 +1186,23 @@ export function AdminPreviewPage() {
           </ChatGlowButton>
         </TopBarActions>
         <TopBarEnd>
-          <TopBarButton as={Link} to="/app/admin/showcase">
-            Vitrin Düzenle
-          </TopBarButton>
-          <TopBarButton
+          <TopBarIconButton
             type="button"
             disabled={isExporting}
+            title="Tümünü dışarı aktar"
+            aria-label="Tümünü dışarı aktar"
             onClick={() => void handleExportOrganization()}
           >
-            Tümünü Dışarı Aktar
-          </TopBarButton>
-          <TopBarButton
-            type="button"
-            onClick={() => {
-              void logout();
-            }}
+            <Download size={16} strokeWidth={2.4} />
+          </TopBarIconButton>
+          <TopBarIconButton
+            as={Link}
+            to="/app/admin/settings"
+            title="Ayarlar"
+            aria-label="Ayarlar"
           >
-            Çıkış Yap
-          </TopBarButton>
+            <Settings size={16} strokeWidth={2.4} />
+          </TopBarIconButton>
           <EarningsBadge title="Aylık kazanç = (aktif öğrenci − 2) × 5000">
             <LiveDotWrap aria-hidden>
               <LiveDotPulse />
@@ -1085,9 +1330,13 @@ export function AdminPreviewPage() {
                 {showDaySlider ? (
                   <>
                     <PreviewDaySlider
-                      days={weekDays}
+                      days={days}
                       selectedIndex={selectedDayIndex}
                       onSelect={setSelectedDayIndex}
+                      todayIndex={todayDayIndex}
+                      extendable
+                      onNearStart={expandPastDays}
+                      onNearEnd={expandFutureDays}
                     />
 
                     {isDayView ? (
@@ -1112,9 +1361,23 @@ export function AdminPreviewPage() {
                 {section === 'tasks' ? (
                   <PreviewTasksSection
                     tasks={tasks}
+                    catalog={curriculumCatalog}
+                    enrolledSubjectIds={
+                      curriculumByStudent[selectedStudent.id]?.subjectIds ?? []
+                    }
+                    enrolledMaterialIds={
+                      curriculumByStudent[selectedStudent.id]?.materialIds ?? []
+                    }
+                    subjectProgress={
+                      curriculumByStudent[selectedStudent.id]?.subjectProgress ?? []
+                    }
+                    materialProgress={
+                      curriculumByStudent[selectedStudent.id]?.materialProgress ?? []
+                    }
                     onAdd={handleAddTask}
                     onEdit={handleEditTask}
                     onDelete={handleDeleteTask}
+                    onUpdateTopicLinks={handleUpdateTaskTopicLinks}
                   />
                 ) : null}
 
@@ -1129,9 +1392,25 @@ export function AdminPreviewPage() {
                 ) : null}
 
                 {section === 'topics' ? (
-                  <ContentCard>
-                    <KonuMateryalSection studentName={selectedStudent.name} />
-                  </ContentCard>
+                  <KonuMateryalPanel
+                    catalog={curriculumCatalog}
+                    state={
+                      curriculumByStudent[selectedStudent.id] ?? {
+                        subjectIds: [],
+                        materialIds: [],
+                        subjectProgress: [],
+                        materialProgress: [],
+                      }
+                    }
+                    denemes={denemes}
+                    canEnroll
+                    onEnrollSubject={handleEnrollSubject}
+                    onUnenrollSubject={handleUnenrollSubject}
+                    onEnrollMaterial={handleEnrollMaterial}
+                    onUnenrollMaterial={handleUnenrollMaterial}
+                    onUpdateSubjectTopic={handleUpdateSubjectTopic}
+                    onUpdateMaterialTopic={handleUpdateMaterialTopic}
+                  />
                 ) : null}
 
                 {section === 'exams' ? (

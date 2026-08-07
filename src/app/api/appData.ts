@@ -2,25 +2,40 @@ import {
   supabase,
   type DbChatMessage,
   type DbChatThread,
+  type DbCurriculumMaterial,
+  type DbCurriculumMaterialTopic,
+  type DbCurriculumSubject,
+  type DbCurriculumSubjectTopic,
   type DbDailyAdminNote,
   type DbDailySubmission,
   type DbDailyTask,
   type DbDenemeEntry,
   type DbDenemeLeafScore,
+  type DbMaterialTopicProgress,
   type DbProfile,
+  type DbStudentMaterial,
   type DbStudentMeeting,
+  type DbStudentSubject,
+  type DbSubjectTopicProgress,
 } from '../../lib/supabase';
 import {
   emptyDailySubmission,
   type ChatMessage,
   type ChatThread,
+  type CurriculumCatalog,
+  type CurriculumMaterial,
+  type CurriculumSubject,
+  type CurriculumTopic,
   type DailySubmission,
   type DenemeEntry,
   type DenemeEntryInput,
   type DenemeLeafScore,
+  type StudentCurriculumState,
   type StudentMeeting,
   type StudentSummary,
   type StudentTask,
+  type TaskTopicLink,
+  type TopicStatus,
 } from '../types';
 import { isMeetingInFuture, normalizeMeetingLink } from '../utils/dates';
 import { parseTaskLabel } from '../utils/taskLabel';
@@ -29,14 +44,30 @@ import {
   prefetchChatSignedUrls,
 } from '../utils/chatSignedUrlCache';
 
+function parseTopicLinks(raw: unknown): TaskTopicLink[] {
+  if (!Array.isArray(raw)) return [];
+  const links: TaskTopicLink[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const scope = (item as { scope?: unknown }).scope;
+    const topicId = (item as { topicId?: unknown }).topicId;
+    if ((scope === 'subject' || scope === 'material') && typeof topicId === 'string' && topicId) {
+      links.push({ scope, topicId });
+    }
+  }
+  return links;
+}
+
 function mapTask(row: DbDailyTask): StudentTask {
   const storedDuration = (row.duration_label ?? '').trim();
+  const topicLinks = parseTopicLinks(row.topic_links);
   if (storedDuration) {
     return {
       id: row.id,
       label: row.label,
       durationLabel: storedDuration,
       completed: row.completed,
+      topicLinks,
     };
   }
 
@@ -47,6 +78,7 @@ function mapTask(row: DbDailyTask): StudentTask {
     label: parsed.label,
     durationLabel: parsed.durationLabel,
     completed: row.completed,
+    topicLinks,
   };
 }
 
@@ -137,7 +169,7 @@ export async function fetchTasksForRange(
 ): Promise<Record<string, StudentTask[]>> {
   const { data, error } = await supabase
     .from('daily_tasks')
-    .select('id, student_id, task_date, label, duration_label, completed, sort_order')
+    .select('id, student_id, task_date, label, duration_label, completed, sort_order, topic_links')
     .eq('student_id', studentId)
     .gte('task_date', fromDate)
     .lte('task_date', toDate)
@@ -164,7 +196,7 @@ export async function fetchOrgTasksForDates(
 
   const { data, error } = await supabase
     .from('daily_tasks')
-    .select('id, student_id, task_date, label, duration_label, completed, sort_order')
+    .select('id, student_id, task_date, label, duration_label, completed, sort_order, topic_links')
     .in('task_date', dates)
     .order('sort_order')
     .order('created_at');
@@ -189,7 +221,7 @@ export async function fetchOrgTasksForRange(
 ): Promise<Record<string, Record<string, StudentTask[]>>> {
   const { data, error } = await supabase
     .from('daily_tasks')
-    .select('id, student_id, task_date, label, duration_label, completed, sort_order')
+    .select('id, student_id, task_date, label, duration_label, completed, sort_order, topic_links')
     .gte('task_date', fromDate)
     .lte('task_date', toDate)
     .order('sort_order')
@@ -472,8 +504,31 @@ export async function fetchSubmissionsForRange(
 }
 
 export async function setTaskCompleted(taskId: string, completed: boolean) {
-  const { error } = await supabase.from('daily_tasks').update({ completed }).eq('id', taskId);
+  const { data, error } = await supabase
+    .from('daily_tasks')
+    .update({ completed })
+    .eq('id', taskId)
+    .select('id, student_id, topic_links')
+    .single();
   if (error) throw error;
+
+  if (completed && data) {
+    const links = parseTopicLinks(data.topic_links);
+    const studentId = data.student_id as string;
+    for (const link of links) {
+      try {
+        if (link.scope === 'subject') {
+          await upsertSubjectTopicProgress(studentId, link.topicId, 'completed_ok');
+        } else {
+          await upsertMaterialTopicProgress(studentId, link.topicId, {
+            status: 'completed_ok',
+          });
+        }
+      } catch {
+        // Best-effort auto-complete; topic may not exist yet.
+      }
+    }
+  }
 }
 
 export type DailyTaskChange = {
@@ -748,7 +803,13 @@ export async function upsertSubmission(
   if (error) throw error;
 }
 
-export async function createTask(studentId: string, dateKey: string, label: string, sortOrder: number) {
+export async function createTask(
+  studentId: string,
+  dateKey: string,
+  label: string,
+  sortOrder: number,
+  topicLinks: TaskTopicLink[] = [],
+) {
   const parsed = parseTaskLabel(label);
   const { data, error } = await supabase
     .from('daily_tasks')
@@ -759,8 +820,9 @@ export async function createTask(studentId: string, dateKey: string, label: stri
       duration_label: parsed.durationLabel,
       sort_order: sortOrder,
       completed: false,
+      topic_links: topicLinks,
     })
-    .select('id, student_id, task_date, label, duration_label, completed, sort_order')
+    .select('id, student_id, task_date, label, duration_label, completed, sort_order, topic_links')
     .single();
 
   if (error) throw error;
@@ -1052,4 +1114,210 @@ export function subscribeChatMessages(
   return () => {
     void supabase.removeChannel(channel);
   };
+}
+
+// ---------------------------------------------------------------------------
+// Konu & Materyal (curriculum)
+// ---------------------------------------------------------------------------
+
+const TOPIC_STATUSES: TopicStatus[] = ['none', 'current', 'completed_warn', 'completed_ok'];
+
+function asTopicStatus(value: string): TopicStatus {
+  return TOPIC_STATUSES.includes(value as TopicStatus) ? (value as TopicStatus) : 'none';
+}
+
+function mapCatalogTopic(
+  row: { id: string; label: string; sort_order: number },
+): CurriculumTopic {
+  return { id: row.id, label: row.label, sortOrder: row.sort_order };
+}
+
+export async function fetchCurriculumCatalog(): Promise<CurriculumCatalog> {
+  const [subjectsRes, subjectTopicsRes, materialsRes, materialTopicsRes] = await Promise.all([
+    supabase
+      .from('curriculum_subjects')
+      .select('id, label, sort_order')
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('curriculum_subject_topics')
+      .select('id, subject_id, label, sort_order')
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('curriculum_materials')
+      .select('id, subject_id, label, sort_order')
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('curriculum_material_topics')
+      .select('id, material_id, label, sort_order')
+      .order('sort_order', { ascending: true }),
+  ]);
+
+  if (subjectsRes.error) throw subjectsRes.error;
+  if (subjectTopicsRes.error) throw subjectTopicsRes.error;
+  if (materialsRes.error) throw materialsRes.error;
+  if (materialTopicsRes.error) throw materialTopicsRes.error;
+
+  const subjectTopics = (subjectTopicsRes.data ?? []) as DbCurriculumSubjectTopic[];
+  const materialTopics = (materialTopicsRes.data ?? []) as DbCurriculumMaterialTopic[];
+
+  const subjects: CurriculumSubject[] = ((subjectsRes.data ?? []) as DbCurriculumSubject[]).map(
+    (row) => ({
+      id: row.id,
+      label: row.label,
+      sortOrder: row.sort_order,
+      topics: subjectTopics.filter((t) => t.subject_id === row.id).map(mapCatalogTopic),
+    }),
+  );
+
+  const materials: CurriculumMaterial[] = ((materialsRes.data ?? []) as DbCurriculumMaterial[]).map(
+    (row) => ({
+      id: row.id,
+      subjectId: row.subject_id,
+      label: row.label,
+      sortOrder: row.sort_order,
+      topics: materialTopics.filter((t) => t.material_id === row.id).map(mapCatalogTopic),
+    }),
+  );
+
+  return { subjects, materials };
+}
+
+export async function fetchStudentCurriculumState(
+  studentId: string,
+): Promise<StudentCurriculumState> {
+  const [subjectsRes, materialsRes, subjectProgRes, materialProgRes] = await Promise.all([
+    supabase.from('student_subjects').select('id, student_id, subject_id').eq('student_id', studentId),
+    supabase
+      .from('student_materials')
+      .select('id, student_id, material_id')
+      .eq('student_id', studentId),
+    supabase
+      .from('subject_topic_progress')
+      .select('id, student_id, subject_id, topic_id, status')
+      .eq('student_id', studentId),
+    supabase
+      .from('material_topic_progress')
+      .select('id, student_id, material_id, topic_id, status, correct_count, question_count')
+      .eq('student_id', studentId),
+  ]);
+
+  if (subjectsRes.error) throw subjectsRes.error;
+  if (materialsRes.error) throw materialsRes.error;
+  if (subjectProgRes.error) throw subjectProgRes.error;
+  if (materialProgRes.error) throw materialProgRes.error;
+
+  return {
+    subjectIds: ((subjectsRes.data ?? []) as DbStudentSubject[]).map((r) => r.subject_id),
+    materialIds: ((materialsRes.data ?? []) as DbStudentMaterial[]).map((r) => r.material_id),
+    subjectProgress: ((subjectProgRes.data ?? []) as DbSubjectTopicProgress[]).map((r) => ({
+      topicId: r.topic_id,
+      subjectId: r.subject_id,
+      status: asTopicStatus(r.status),
+    })),
+    materialProgress: ((materialProgRes.data ?? []) as DbMaterialTopicProgress[]).map((r) => ({
+      topicId: r.topic_id,
+      materialId: r.material_id,
+      status: asTopicStatus(r.status),
+      correctCount: r.correct_count,
+      questionCount: r.question_count,
+    })),
+  };
+}
+
+export async function enrollStudentSubject(studentId: string, subjectId: string) {
+  const { error } = await supabase.from('student_subjects').insert({
+    student_id: studentId,
+    subject_id: subjectId,
+  });
+  if (error) throw error;
+}
+
+export async function unenrollStudentSubject(studentId: string, subjectId: string) {
+  const { error } = await supabase
+    .from('student_subjects')
+    .delete()
+    .eq('student_id', studentId)
+    .eq('subject_id', subjectId);
+  if (error) throw error;
+}
+
+export async function enrollStudentMaterial(studentId: string, materialId: string) {
+  const { error } = await supabase.from('student_materials').insert({
+    student_id: studentId,
+    material_id: materialId,
+  });
+  if (error) throw error;
+}
+
+export async function unenrollStudentMaterial(studentId: string, materialId: string) {
+  const { error } = await supabase
+    .from('student_materials')
+    .delete()
+    .eq('student_id', studentId)
+    .eq('material_id', materialId);
+  if (error) throw error;
+}
+
+export async function upsertSubjectTopicProgress(
+  studentId: string,
+  topicId: string,
+  status: TopicStatus,
+) {
+  const { data: topic, error: topicError } = await supabase
+    .from('curriculum_subject_topics')
+    .select('id, subject_id')
+    .eq('id', topicId)
+    .maybeSingle();
+  if (topicError) throw topicError;
+  if (!topic) throw new Error('Subject topic not found');
+
+  const { error } = await supabase.from('subject_topic_progress').upsert(
+    {
+      student_id: studentId,
+      subject_id: topic.subject_id,
+      topic_id: topicId,
+      status,
+    },
+    { onConflict: 'student_id,topic_id' },
+  );
+  if (error) throw error;
+}
+
+export async function upsertMaterialTopicProgress(
+  studentId: string,
+  topicId: string,
+  input: {
+    status: TopicStatus;
+    correctCount?: number | null;
+    questionCount?: number | null;
+  },
+) {
+  const { data: topic, error: topicError } = await supabase
+    .from('curriculum_material_topics')
+    .select('id, material_id')
+    .eq('id', topicId)
+    .maybeSingle();
+  if (topicError) throw topicError;
+  if (!topic) throw new Error('Material topic not found');
+
+  const { error } = await supabase.from('material_topic_progress').upsert(
+    {
+      student_id: studentId,
+      material_id: topic.material_id,
+      topic_id: topicId,
+      status: input.status,
+      correct_count: input.correctCount ?? null,
+      question_count: input.questionCount ?? null,
+    },
+    { onConflict: 'student_id,topic_id' },
+  );
+  if (error) throw error;
+}
+
+export async function updateTaskTopicLinks(taskId: string, topicLinks: TaskTopicLink[]) {
+  const { error } = await supabase
+    .from('daily_tasks')
+    .update({ topic_links: topicLinks })
+    .eq('id', taskId);
+  if (error) throw error;
 }

@@ -21,6 +21,22 @@ export function buildWeekDays(anchor = new Date()): Date[] {
   });
 }
 
+/** Inclusive day offsets relative to today (0 = today). */
+export function buildDaysFromOffsets(
+  startOffset: number,
+  endOffset: number,
+  anchor = new Date(),
+): Date[] {
+  const today = startOfDay(anchor);
+  const days: Date[] = [];
+  for (let offset = startOffset; offset <= endOffset; offset += 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + offset);
+    days.push(date);
+  }
+  return days;
+}
+
 export function formatDayPill(date: Date): string {
   return new Intl.DateTimeFormat('tr-TR', {
     weekday: 'short',

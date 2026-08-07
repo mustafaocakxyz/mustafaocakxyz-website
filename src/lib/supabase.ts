@@ -27,6 +27,7 @@ export type DbDailyTask = {
   duration_label?: string;
   completed: boolean;
   sort_order: number;
+  topic_links?: unknown;
 };
 
 export type DbDailySubmission = {
@@ -97,4 +98,61 @@ export type DbDenemeEntry = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type DbCurriculumSubject = {
+  id: string;
+  label: string;
+  sort_order: number;
+};
+
+export type DbCurriculumSubjectTopic = {
+  id: string;
+  subject_id: string;
+  label: string;
+  sort_order: number;
+};
+
+export type DbCurriculumMaterial = {
+  id: string;
+  subject_id: string;
+  label: string;
+  sort_order: number;
+};
+
+export type DbCurriculumMaterialTopic = {
+  id: string;
+  material_id: string;
+  label: string;
+  sort_order: number;
+};
+
+export type DbStudentSubject = {
+  id: string;
+  student_id: string;
+  subject_id: string;
+};
+
+export type DbStudentMaterial = {
+  id: string;
+  student_id: string;
+  material_id: string;
+};
+
+export type DbSubjectTopicProgress = {
+  id: string;
+  student_id: string;
+  subject_id: string;
+  topic_id: string;
+  status: string;
+};
+
+export type DbMaterialTopicProgress = {
+  id: string;
+  student_id: string;
+  material_id: string;
+  topic_id: string;
+  status: string;
+  correct_count: number | null;
+  question_count: number | null;
 };

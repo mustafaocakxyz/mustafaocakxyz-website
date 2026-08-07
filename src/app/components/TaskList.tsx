@@ -69,6 +69,17 @@ const TaskLabel = styled.span<{ $completed: boolean }>`
   text-decoration: ${({ $completed }) => ($completed ? 'line-through' : 'none')};
 `;
 
+const TopicLinkBadge = styled.span`
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid ${t.border};
+  background: rgba(15, 23, 42, 0.45);
+  color: ${t.muted};
+  font-size: 0.72rem;
+  font-weight: 700;
+`;
+
 const EmptyState = styled.p`
   margin: 0;
   padding: 12px 4px;
@@ -98,6 +109,9 @@ export function TaskList({ tasks, onToggle, readOnly = false }: TaskListProps) {
             {task.completed ? <Check size={14} strokeWidth={3} /> : null}
           </CheckboxVisual>
           <TaskLabel $completed={task.completed}>{task.label}</TaskLabel>
+          {(task.topicLinks?.length ?? 0) > 0 ? (
+            <TopicLinkBadge>{task.topicLinks!.length} konu</TopicLinkBadge>
+          ) : null}
           {task.durationLabel ? (
             <TaskDurationPill $muted={task.completed}>{task.durationLabel}</TaskDurationPill>
           ) : null}

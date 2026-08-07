@@ -21,6 +21,7 @@ import {
   StudentHomeLogout,
   StudentHomeNav,
   StudentHomeNavLink,
+  StudentHomeNavLinkWide,
   StudentHomeTitle,
   StudentHomeTopBar,
   StudentPageBody,
@@ -305,6 +306,7 @@ export function StudentDashboardPage() {
         <StudentHomeNav>
           <StudentHomeNavLink to="/app/student/chat">Sohbet</StudentHomeNavLink>
           <StudentHomeNavLink to="/app/student/denemeler">Denemeler</StudentHomeNavLink>
+          <StudentHomeNavLinkWide to="/app/student/konu">Konu & Materyal</StudentHomeNavLinkWide>
         </StudentHomeNav>
         <StudentHomeLogout
           type="button"

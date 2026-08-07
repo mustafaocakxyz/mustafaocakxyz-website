@@ -145,6 +145,12 @@ export const StudentHomeNavLink = styled(Link)`
   }
 `;
 
+export const StudentHomeNavLinkWide = styled(StudentHomeNavLink)`
+  @media (max-width: 639px) {
+    grid-column: 1 / -1;
+  }
+`;
+
 export const StudentSubTopBar = styled.header`
   width: 100%;
   max-width: 100%;
@@ -184,6 +190,12 @@ export const StudentSubActions = styled.div`
   @media (min-width: 640px) {
     display: flex;
     width: auto;
+  }
+`;
+
+export const StudentSubActionsTriple = styled(StudentSubActions)`
+  @media (max-width: 639px) {
+    grid-template-columns: 1fr;
   }
 `;
 

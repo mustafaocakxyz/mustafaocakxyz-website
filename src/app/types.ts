@@ -14,6 +14,8 @@ export type StudentTask = {
   /** Parsed estimate, e.g. "2 saat" / "30 dak". Empty if none. */
   durationLabel: string;
   completed: boolean;
+  /** Optional auto-complete links for konu/materyal topics. */
+  topicLinks?: TaskTopicLink[];
 };
 
 /** Structured daily form. Null means not filled yet (not the same as 0). */
@@ -85,6 +87,80 @@ export type DenemeEntryInput = {
   scores: DenemeLeafScore[];
   topics: string[];
 };
+
+/** Subject / material topic progress states. */
+export type TopicStatus = 'none' | 'current' | 'completed_warn' | 'completed_ok';
+
+export const TOPIC_STATUS_LABEL: Record<TopicStatus, string> = {
+  none: '—',
+  current: 'Devam',
+  completed_warn: 'Tamam ⚠',
+  completed_ok: 'Tamam ✓',
+};
+
+export function isTopicCompleted(status: TopicStatus): boolean {
+  return status === 'completed_warn' || status === 'completed_ok';
+}
+
+export type CurriculumTopic = {
+  id: string;
+  label: string;
+  sortOrder: number;
+};
+
+export type CurriculumSubject = {
+  id: string;
+  label: string;
+  sortOrder: number;
+  topics: CurriculumTopic[];
+};
+
+export type CurriculumMaterial = {
+  id: string;
+  subjectId: string;
+  label: string;
+  sortOrder: number;
+  topics: CurriculumTopic[];
+};
+
+export type CurriculumCatalog = {
+  subjects: CurriculumSubject[];
+  materials: CurriculumMaterial[];
+};
+
+export type SubjectTopicProgress = {
+  topicId: string;
+  subjectId: string;
+  status: TopicStatus;
+};
+
+export type MaterialTopicProgress = {
+  topicId: string;
+  materialId: string;
+  status: TopicStatus;
+  correctCount: number | null;
+  questionCount: number | null;
+};
+
+export type TaskTopicLink = {
+  scope: 'subject' | 'material';
+  topicId: string;
+};
+
+export type StudentCurriculumState = {
+  subjectIds: string[];
+  materialIds: string[];
+  subjectProgress: SubjectTopicProgress[];
+  materialProgress: MaterialTopicProgress[];
+};
+
+export function materialCorrectPercent(
+  correctCount: number | null,
+  questionCount: number | null,
+): number | null {
+  if (correctCount == null || questionCount == null || questionCount <= 0) return null;
+  return Math.round((100 * correctCount) / questionCount);
+}
 
 export const emptyDailySubmission = (): DailySubmission => ({
   uyumaSaati: null,
