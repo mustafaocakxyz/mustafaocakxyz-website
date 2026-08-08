@@ -229,7 +229,7 @@ export function OgrenciDetailPage() {
 
         <Panel>
           <PanelTitle>Bugünkü program</PanelTitle>
-          <TaskList tasks={tasks} readOnly />
+          <TaskList tasks={tasks} readOnly accent="orange" />
         </Panel>
       </Wrap>
     </Shell>
