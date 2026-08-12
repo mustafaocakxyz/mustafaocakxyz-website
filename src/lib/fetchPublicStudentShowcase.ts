@@ -3,7 +3,10 @@ import { parseTaskLabel } from '../app/utils/taskLabel';
 import { DEMO_STUDENTS, type DemoStudentShowcase } from '../data/demoStudentShowcase';
 import { supabase } from './supabase';
 
-/** Hidden from public /ogrenciler list, detail, and public student counts. */
+/**
+ * Temporary fallback hide list if older RPC builds are still deployed.
+ * Prefer profiles.show_on_ogrenciler via 026_student_visibility_settings.sql.
+ */
 export const HIDDEN_PUBLIC_SHOWCASE_STUDENT_IDS = new Set([
   'bd318631-4c4c-4318-93cd-3aef4c39fbf9',
 ]);
@@ -13,6 +16,9 @@ export type PublicStudentSummary = {
   displayName: string;
   createdAt: string;
   showcaseHighlights: string[];
+  dayCountActive: boolean;
+  dayCountFrozenDays: number | null;
+  dayCountStartDate: string | null;
 };
 
 export type ShowcaseStudent = {
@@ -46,6 +52,16 @@ export function daysInProgramSince(createdAt: string, now = new Date()): number 
   return Math.max(1, days + 1);
 }
 
+export function resolvePublicDaysInProgram(summary: PublicStudentSummary, now = new Date()): number {
+  if (!summary.dayCountActive) {
+    if (typeof summary.dayCountFrozenDays === 'number' && summary.dayCountFrozenDays >= 1) {
+      return summary.dayCountFrozenDays;
+    }
+  }
+  const basis = summary.dayCountStartDate || summary.createdAt;
+  return daysInProgramSince(basis, now);
+}
+
 function demoTemplateForIndex(index: number): DemoStudentShowcase {
   return DEMO_STUDENTS[index % DEMO_STUDENTS.length];
 }
@@ -69,7 +85,7 @@ export function toShowcaseStudent(
   return {
     id: summary.id,
     shortName: shortenPublicName(summary.displayName),
-    daysInProgram: daysInProgramSince(summary.createdAt),
+    daysInProgram: resolvePublicDaysInProgram(summary),
     avgStudyHours: demo.avgStudyHours,
     avgScreenTime: demo.avgScreenTime,
     sleepSchedule: demo.sleepSchedule,
@@ -95,6 +111,17 @@ export async function fetchPublicStudentSummaries(): Promise<PublicStudentSummar
           row.showcaseHighlight ??
           row.showcase_highlight,
       ),
+      dayCountActive: row.dayCountActive !== false && row.day_count_active !== false,
+      dayCountFrozenDays: (() => {
+        const raw = row.dayCountFrozenDays ?? row.day_count_frozen_days;
+        const n = typeof raw === 'number' ? raw : Number(raw);
+        return Number.isFinite(n) ? n : null;
+      })(),
+      dayCountStartDate: (() => {
+        const raw = row.dayCountStartDate ?? row.day_count_start_date;
+        if (raw == null || raw === '') return null;
+        return String(raw).slice(0, 10);
+      })(),
     }))
     .filter((row) => !HIDDEN_PUBLIC_SHOWCASE_STUDENT_IDS.has(row.id));
 }

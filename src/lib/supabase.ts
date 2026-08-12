@@ -17,6 +17,13 @@ export type DbProfile = {
   login_username: string;
   auth_email: string;
   is_active: boolean;
+  show_on_admin_dashboard?: boolean;
+  show_on_ogrenciler?: boolean;
+  count_in_earnings?: boolean;
+  day_count_active?: boolean;
+  day_count_frozen_days?: number | null;
+  day_count_start_date?: string | null;
+  created_at?: string;
 };
 
 export type DbDailyTask = {

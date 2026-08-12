@@ -15,6 +15,7 @@ import {
   exportStudentJson,
   fetchCurriculumCatalog,
   fetchDenemesForStudent,
+  fetchEarningsStudentCount,
   fetchOrgAdminNotesForRange,
   fetchOrgMeetingsForRange,
   fetchOrgSubmissionsForRange,
@@ -144,11 +145,9 @@ const PROFILE_SECTIONS: { id: Extract<SectionId, 'topics' | 'exams' | 'notes'>; 
 ];
 
 const PRICE_PER_STUDENT = 5000;
-const FREE_TRIAL_OFFSET = 2;
 
-function formatMonthlyEarnings(activeStudentCount: number): string {
-  const paying = Math.max(0, activeStudentCount - FREE_TRIAL_OFFSET);
-  const amount = paying * PRICE_PER_STUDENT;
+function formatMonthlyEarnings(earningsStudentCount: number): string {
+  const amount = Math.max(0, earningsStudentCount) * PRICE_PER_STUDENT;
   return `${amount.toLocaleString('tr-TR')} ₺`;
 }
 
@@ -372,6 +371,7 @@ export function AdminPreviewPage() {
   const todayDayIndex = -dayOffsetStart;
 
   const [students, setStudents] = useState<StudentSummary[]>([]);
+  const [earningsStudentCount, setEarningsStudentCount] = useState(0);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [selectedDayIndex, setSelectedDayIndex] = useState(ADMIN_TODAY_INDEX);
   const [section, setSection] = useState<SectionId>('tasks');
@@ -506,11 +506,16 @@ export function AdminPreviewPage() {
 
     const bootstrap = async () => {
       try {
-        const [rows, catalog] = await Promise.all([fetchStudents(), fetchCurriculumCatalog()]);
+        const [rows, catalog, earningsCount] = await Promise.all([
+          fetchStudents(),
+          fetchCurriculumCatalog(),
+          fetchEarningsStudentCount(),
+        ]);
         if (!isMounted) return;
         bump(18);
         setStudents(rows);
         setCurriculumCatalog(catalog);
+        setEarningsStudentCount(earningsCount);
 
         const studentIds = rows.map((row) => row.id);
         const advancePerQuery = 16;
@@ -584,6 +589,22 @@ export function AdminPreviewPage() {
     writeWeekCache,
     applyWeekSnapshot,
   ]);
+
+  useEffect(() => {
+    if (isBootstrapping || !user || user.role !== 'admin') return;
+    let mounted = true;
+    void (async () => {
+      try {
+        const count = await fetchEarningsStudentCount();
+        if (mounted) setEarningsStudentCount(count);
+      } catch {
+        // Keep last known earnings count on refresh failure.
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [isBootstrapping, user]);
 
   useEffect(() => {
     if (isBootstrapping || !selectedStudentId) return;
@@ -1211,12 +1232,12 @@ export function AdminPreviewPage() {
           >
             <Settings size={16} strokeWidth={2.4} />
           </TopBarIconButton>
-          <EarningsBadge title="Aylık kazanç = (aktif öğrenci − 2) × 5000">
+          <EarningsBadge title="Aylık kazanç = kazanca dahil öğrenci sayısı × 5000 ₺">
             <LiveDotWrap aria-hidden>
               <LiveDotPulse />
               <LiveDotCore />
             </LiveDotWrap>
-            <EarningsAmount>{formatMonthlyEarnings(students.length)}</EarningsAmount>
+            <EarningsAmount>{formatMonthlyEarnings(earningsStudentCount)}</EarningsAmount>
           </EarningsBadge>
         </TopBarEnd>
       </PreviewTopBar>

@@ -1,11 +1,20 @@
+import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
+import {
+  fetchStudentAdminSettings,
+  updateStudentSetting,
+  type StudentSettingKey,
+} from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
+import type { StudentAdminSettings } from '../types';
 import { preview as t } from '../preview/adminPreviewTheme';
 import {
   ContentCard,
   ContentSub,
   ContentTitle,
+  EmptyState,
+  ErrorText,
   LoadingText,
   PreviewBody,
   PreviewFrame,
@@ -73,8 +82,153 @@ const ActionHint = styled.span`
   color: ${t.muted};
 `;
 
+const StudentSettingsStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+`;
+
+const StudentRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: ${t.radiusSm};
+  border: 1px solid ${t.border};
+  background: ${t.panel2};
+
+  @media (max-width: 720px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+`;
+
+const StudentName = styled.div`
+  flex: 1 1 160px;
+  min-width: 0;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: ${t.text};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const ToggleCluster = styled.div`
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+
+  @media (max-width: 720px) {
+    justify-content: stretch;
+
+    & > * {
+      flex: 1 1 0;
+    }
+  }
+`;
+
+const ToggleChip = styled.button<{ $on: boolean; $busy?: boolean }>`
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 72px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid ${({ $on }) => ($on ? 'rgba(52, 211, 153, 0.45)' : t.border)};
+  background: ${({ $on }) => ($on ? 'rgba(52, 211, 153, 0.14)' : 'rgba(15, 23, 42, 0.45)')};
+  color: ${t.text};
+  font: inherit;
+  cursor: ${({ $busy }) => ($busy ? 'wait' : 'pointer')};
+  opacity: ${({ $busy }) => ($busy ? 0.7 : 1)};
+
+  &:hover:not(:disabled) {
+    border-color: rgba(96, 165, 250, 0.45);
+  }
+
+  &:disabled {
+    cursor: wait;
+  }
+`;
+
+const ToggleLabel = styled.span`
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: ${t.muted};
+  white-space: nowrap;
+`;
+
+const ToggleValue = styled.span<{ $on: boolean }>`
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: ${({ $on }) => ($on ? t.success : t.mutedSoft)};
+`;
+
+const SETTING_ROWS: { key: StudentSettingKey; label: string; title: string }[] = [
+  { key: 'showOnAdminDashboard', label: 'Panel', title: 'Admin panelde göster' },
+  { key: 'showOnOgrenciler', label: 'Öğrenciler', title: 'Öğrenciler sayfasında göster' },
+  { key: 'countInEarnings', label: 'Kazanç', title: 'Kazanç hesabına dahil' },
+  { key: 'dayCountActive', label: 'Gün', title: 'Gün sayacı aktif' },
+];
+
+function settingValue(student: StudentAdminSettings, key: StudentSettingKey): boolean {
+  if (key === 'showOnAdminDashboard') return student.showOnAdminDashboard;
+  if (key === 'showOnOgrenciler') return student.showOnOgrenciler;
+  if (key === 'countInEarnings') return student.countInEarnings;
+  return student.dayCountActive;
+}
+
 export function AdminSettingsPage() {
   const { user, isLoading, logout } = useAppAuth();
+  const [students, setStudents] = useState<StudentAdminSettings[]>([]);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+    let mounted = true;
+    setPageLoading(true);
+    setError('');
+    void (async () => {
+      try {
+        const rows = await fetchStudentAdminSettings();
+        if (mounted) setStudents(rows);
+      } catch {
+        if (mounted) setError('Öğrenci ayarları yüklenemedi. 026 SQL çalıştırıldı mı?');
+      } finally {
+        if (mounted) setPageLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
+  const handleToggle = async (studentId: string, key: StudentSettingKey) => {
+    const current = students.find((row) => row.id === studentId);
+    if (!current) return;
+    const nextValue = !settingValue(current, key);
+    const token = `${studentId}:${key}`;
+    setBusyKey(token);
+    setError('');
+    try {
+      const updated = await updateStudentSetting(studentId, key, nextValue);
+      setStudents((rows) => rows.map((row) => (row.id === studentId ? updated : row)));
+    } catch {
+      setError('Ayar kaydedilemedi.');
+    } finally {
+      setBusyKey(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -123,6 +277,46 @@ export function AdminSettingsPage() {
                 <ActionHint>Oturumu kapat</ActionHint>
               </SettingsButton>
             </SettingsStack>
+          </ContentCard>
+
+          <ContentCard>
+            <ContentTitle>Öğrenci ayarları</ContentTitle>
+            <ContentSub>
+              Panel, öğrenciler sayfası, kazanç ve gün sayacı görünürlüğünü öğrenci bazında aç/kapa.
+            </ContentSub>
+            {error ? <ErrorText>{error}</ErrorText> : null}
+            {pageLoading ? <LoadingText>Yükleniyor...</LoadingText> : null}
+            {!pageLoading && students.length === 0 ? (
+              <EmptyState>Aktif öğrenci yok.</EmptyState>
+            ) : null}
+            <StudentSettingsStack>
+              {students.map((student) => (
+                <StudentRow key={student.id}>
+                  <StudentName title={student.name}>{student.name}</StudentName>
+                  <ToggleCluster>
+                    {SETTING_ROWS.map((row) => {
+                      const on = settingValue(student, row.key);
+                      const busy = busyKey === `${student.id}:${row.key}`;
+                      return (
+                        <ToggleChip
+                          key={row.key}
+                          type="button"
+                          $on={on}
+                          $busy={busy}
+                          disabled={busy}
+                          title={row.title}
+                          aria-label={`${student.name}: ${row.title}`}
+                          onClick={() => void handleToggle(student.id, row.key)}
+                        >
+                          <ToggleLabel>{row.label}</ToggleLabel>
+                          <ToggleValue $on={on}>{on ? 'Açık' : 'Kapalı'}</ToggleValue>
+                        </ToggleChip>
+                      );
+                    })}
+                  </ToggleCluster>
+                </StudentRow>
+              ))}
+            </StudentSettingsStack>
           </ContentCard>
         </PreviewFrame>
       </PreviewBody>

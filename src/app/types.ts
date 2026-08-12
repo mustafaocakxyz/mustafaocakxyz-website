@@ -32,6 +32,21 @@ export type StudentSummary = {
   name: string;
 };
 
+export type StudentVisibilitySettings = {
+  showOnAdminDashboard: boolean;
+  showOnOgrenciler: boolean;
+  countInEarnings: boolean;
+  dayCountActive: boolean;
+  dayCountFrozenDays: number | null;
+  dayCountStartDate: string | null;
+};
+
+export type StudentAdminSettings = {
+  id: string;
+  name: string;
+  createdAt: string;
+} & StudentVisibilitySettings;
+
 export type StudentMeeting = {
   id: string;
   studentId: string;

@@ -5,8 +5,8 @@ import {
   chatAttachmentFileName,
   createChatAttachmentSignedUrl,
   ensureChatThread,
+  fetchAllActiveStudents,
   fetchChatMessages,
-  fetchStudents,
   prefetchChatAttachmentUrls,
   sendChatAttachmentMessage,
   sendChatTextMessage,
@@ -497,7 +497,7 @@ export function AdminChatPage() {
     if (!user || user.role !== 'admin') return;
     let mounted = true;
     setPageLoading(true);
-    void fetchStudents()
+    void fetchAllActiveStudents()
       .then((rows) => {
         if (!mounted) return;
         setStudents(rows);

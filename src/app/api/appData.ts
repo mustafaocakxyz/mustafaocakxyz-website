@@ -30,6 +30,7 @@ import {
   type DenemeEntry,
   type DenemeEntryInput,
   type DenemeLeafScore,
+  type StudentAdminSettings,
   type StudentCurriculumState,
   type StudentMeeting,
   type StudentSummary,
@@ -152,6 +153,7 @@ export async function fetchStudents(): Promise<StudentSummary[]> {
     .select('id, display_name')
     .eq('role', 'student')
     .eq('is_active', true)
+    .eq('show_on_admin_dashboard', true)
     .order('display_name');
 
   if (error) throw error;
@@ -160,6 +162,160 @@ export async function fetchStudents(): Promise<StudentSummary[]> {
     id: row.id,
     name: row.display_name,
   }));
+}
+
+/** All active students for chat / internal tools (ignores dashboard visibility). */
+export async function fetchAllActiveStudents(): Promise<StudentSummary[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name')
+    .eq('role', 'student')
+    .eq('is_active', true)
+    .order('display_name');
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.display_name,
+  }));
+}
+
+function mapStudentAdminSettings(row: {
+  id: string;
+  display_name: string;
+  created_at: string;
+  show_on_admin_dashboard?: boolean | null;
+  show_on_ogrenciler?: boolean | null;
+  count_in_earnings?: boolean | null;
+  day_count_active?: boolean | null;
+  day_count_frozen_days?: number | null;
+  day_count_start_date?: string | null;
+}): StudentAdminSettings {
+  return {
+    id: row.id,
+    name: row.display_name,
+    createdAt: row.created_at,
+    showOnAdminDashboard: row.show_on_admin_dashboard !== false,
+    showOnOgrenciler: row.show_on_ogrenciler !== false,
+    countInEarnings: row.count_in_earnings !== false,
+    dayCountActive: row.day_count_active !== false,
+    dayCountFrozenDays:
+      typeof row.day_count_frozen_days === 'number' ? row.day_count_frozen_days : null,
+    dayCountStartDate: row.day_count_start_date ?? null,
+  };
+}
+
+export async function fetchStudentAdminSettings(): Promise<StudentAdminSettings[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(
+      'id, display_name, created_at, show_on_admin_dashboard, show_on_ogrenciler, count_in_earnings, day_count_active, day_count_frozen_days, day_count_start_date',
+    )
+    .eq('role', 'student')
+    .eq('is_active', true)
+    .order('display_name');
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => mapStudentAdminSettings(row as Parameters<typeof mapStudentAdminSettings>[0]));
+}
+
+export async function fetchEarningsStudentCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('role', 'student')
+    .eq('is_active', true)
+    .eq('count_in_earnings', true);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export type StudentSettingKey =
+  | 'showOnAdminDashboard'
+  | 'showOnOgrenciler'
+  | 'countInEarnings'
+  | 'dayCountActive';
+
+function istanbulTodayDateKey(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Istanbul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function daysBetweenDateKeys(fromKey: string, toKey: string): number {
+  const from = new Date(`${fromKey}T12:00:00`);
+  const to = new Date(`${toKey}T12:00:00`);
+  const diff = Math.floor((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000));
+  return Math.max(1, diff + 1);
+}
+
+function shiftDateKey(dateKey: string, deltaDays: number): string {
+  const date = new Date(`${dateKey}T12:00:00`);
+  date.setDate(date.getDate() + deltaDays);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export async function updateStudentSetting(
+  studentId: string,
+  key: StudentSettingKey,
+  value: boolean,
+): Promise<StudentAdminSettings> {
+  const { data: current, error: readError } = await supabase
+    .from('profiles')
+    .select(
+      'id, display_name, created_at, show_on_admin_dashboard, show_on_ogrenciler, count_in_earnings, day_count_active, day_count_frozen_days, day_count_start_date',
+    )
+    .eq('id', studentId)
+    .eq('role', 'student')
+    .single();
+  if (readError) throw readError;
+
+  const mapped = mapStudentAdminSettings(current as Parameters<typeof mapStudentAdminSettings>[0]);
+  const todayKey = istanbulTodayDateKey();
+  const startKey =
+    mapped.dayCountStartDate ??
+    (mapped.createdAt ? mapped.createdAt.slice(0, 10) : todayKey);
+
+  const patch: Record<string, boolean | number | string | null> = {};
+
+  if (key === 'showOnAdminDashboard') patch.show_on_admin_dashboard = value;
+  if (key === 'showOnOgrenciler') patch.show_on_ogrenciler = value;
+  if (key === 'countInEarnings') patch.count_in_earnings = value;
+
+  if (key === 'dayCountActive') {
+    if (value) {
+      const frozen = mapped.dayCountFrozenDays ?? daysBetweenDateKeys(startKey, todayKey);
+      patch.day_count_active = true;
+      patch.day_count_frozen_days = null;
+      patch.day_count_start_date = shiftDateKey(todayKey, -(frozen - 1));
+    } else {
+      patch.day_count_active = false;
+      patch.day_count_frozen_days = daysBetweenDateKeys(startKey, todayKey);
+      patch.day_count_start_date = startKey;
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(patch)
+    .eq('id', studentId)
+    .eq('role', 'student')
+    .select(
+      'id, display_name, created_at, show_on_admin_dashboard, show_on_ogrenciler, count_in_earnings, day_count_active, day_count_frozen_days, day_count_start_date',
+    )
+    .single();
+  if (error) throw error;
+
+  return mapStudentAdminSettings(data as Parameters<typeof mapStudentAdminSettings>[0]);
 }
 
 export async function fetchTasksForRange(
