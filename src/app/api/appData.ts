@@ -22,6 +22,8 @@ import {
   emptyDailySubmission,
   type ChatMessage,
   type ChatThread,
+  type AdminChatInboxItem,
+  type ChatMessageType,
   type CurriculumCatalog,
   type CurriculumMaterial,
   type CurriculumSubject,
@@ -1118,6 +1120,11 @@ function mapChatThread(row: DbChatThread): ChatThread {
     studentId: row.student_id,
     organizationId: row.organization_id,
     lastMessageAt: row.last_message_at,
+    lastMessagePreview: row.last_message_preview ?? null,
+    lastMessageType: (row.last_message_type as ChatMessageType | null | undefined) ?? null,
+    lastSenderId: row.last_sender_id ?? null,
+    adminLastReadAt: row.admin_last_read_at ?? null,
+    adminUnreadCount: row.admin_unread_count ?? 0,
   };
 }
 
@@ -1133,9 +1140,77 @@ function mapChatMessage(row: DbChatMessage): ChatMessage {
   };
 }
 
+const CHAT_THREAD_SELECT =
+  'id, organization_id, student_id, last_message_at, last_message_preview, last_message_type, last_sender_id, admin_last_read_at, admin_unread_count, created_at, updated_at';
+
+function sortAdminChatInbox(items: AdminChatInboxItem[]): AdminChatInboxItem[] {
+  return [...items].sort((a, b) => {
+    if (a.lastMessageAt && b.lastMessageAt) {
+      if (a.lastMessageAt !== b.lastMessageAt) {
+        return a.lastMessageAt < b.lastMessageAt ? 1 : -1;
+      }
+    } else if (a.lastMessageAt) {
+      return -1;
+    } else if (b.lastMessageAt) {
+      return 1;
+    }
+    return a.studentName.localeCompare(b.studentName, 'tr');
+  });
+}
+
+/** Active students + thread preview/unread for admin chat sidebar. */
+export async function fetchAdminChatInbox(): Promise<AdminChatInboxItem[]> {
+  const [students, threadsRes] = await Promise.all([
+    fetchAllActiveStudents(),
+    supabase
+      .from('chat_threads')
+      .select(CHAT_THREAD_SELECT),
+  ]);
+
+  if (threadsRes.error) throw threadsRes.error;
+
+  const threadByStudent = new Map(
+    ((threadsRes.data ?? []) as DbChatThread[]).map((row) => [row.student_id, mapChatThread(row)]),
+  );
+
+  return sortAdminChatInbox(
+    students.map((student) => {
+      const thread = threadByStudent.get(student.id);
+      return {
+        studentId: student.id,
+        studentName: student.name,
+        threadId: thread?.id ?? null,
+        lastMessageAt: thread?.lastMessageAt ?? null,
+        lastMessagePreview: thread?.lastMessagePreview ?? null,
+        lastMessageType: thread?.lastMessageType ?? null,
+        lastSenderId: thread?.lastSenderId ?? null,
+        unreadCount: thread?.adminUnreadCount ?? 0,
+      };
+    }),
+  );
+}
+
+/** Count of students/threads with at least one unread admin message (navbar badge). */
+export async function fetchAdminChatUnreadTotal(): Promise<number> {
+  const { data, error } = await supabase.from('chat_threads').select('admin_unread_count');
+  if (error) throw error;
+  return (data ?? []).reduce((count, row) => {
+    const n = typeof row.admin_unread_count === 'number' ? row.admin_unread_count : 0;
+    return n > 0 ? count + 1 : count;
+  }, 0);
+}
+
 export async function ensureChatThread(studentId: string): Promise<ChatThread> {
   const { data, error } = await supabase.rpc('ensure_chat_thread', {
     p_student_id: studentId,
+  });
+  if (error) throw error;
+  return mapChatThread(data as DbChatThread);
+}
+
+export async function markChatThreadRead(threadId: string): Promise<ChatThread> {
+  const { data, error } = await supabase.rpc('mark_chat_thread_read', {
+    p_thread_id: threadId,
   });
   if (error) throw error;
   return mapChatThread(data as DbChatThread);
@@ -1274,6 +1349,37 @@ export function subscribeChatMessages(
       },
       (payload) => {
         onInsert(mapChatMessage(payload.new as DbChatMessage));
+      },
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
+/** Live updates for admin inbox sidebar (thread preview / unread). */
+export function subscribeAdminChatInbox(
+  organizationId: string,
+  onChange: (thread: ChatThread) => void,
+): () => void {
+  const channel = supabase
+    .channel(`chat-inbox:${organizationId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'chat_threads',
+        filter: `organization_id=eq.${organizationId}`,
+      },
+      (payload) => {
+        const row =
+          payload.eventType === 'DELETE'
+            ? (payload.old as DbChatThread | undefined)
+            : (payload.new as DbChatThread | undefined);
+        if (!row?.id) return;
+        onChange(mapChatThread(row));
       },
     )
     .subscribe();

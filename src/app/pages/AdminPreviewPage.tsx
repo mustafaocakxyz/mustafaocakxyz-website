@@ -28,8 +28,10 @@ import {
   fetchTasksForRange,
   fetchAdminNotesForRange,
   fetchMeetingsForRange,
+  fetchAdminChatUnreadTotal,
   getSubmissionForDate,
   subscribeDailyTasks,
+  subscribeAdminChatInbox,
   unenrollStudentMaterial,
   unenrollStudentSubject,
   updateDenemeEntry,
@@ -111,6 +113,7 @@ import {
   StudentListScroll,
   StudentName,
   ChatGlowButton,
+  ChatUnreadBadge,
   TopBarActions,
   TopBarIconButton,
   TopBarEnd,
@@ -400,6 +403,7 @@ export function AdminPreviewPage() {
   const [isPageLoading, setIsPageLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState('');
+  const [chatUnreadTotal, setChatUnreadTotal] = useState(0);
 
   const applyWeekSnapshot = useCallback((snapshot: StudentWeekSnapshot) => {
     setTasksByDate(snapshot.tasksByDate);
@@ -781,6 +785,37 @@ export function AdminPreviewPage() {
     weekFrom,
     weekTo,
   ]);
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin' || !user.organizationId) return;
+
+    let mounted = true;
+    const refreshUnread = () => {
+      void fetchAdminChatUnreadTotal()
+        .then((total) => {
+          if (mounted) setChatUnreadTotal(total);
+        })
+        .catch(() => {
+          /* inbox migration may not be applied yet */
+        });
+    };
+
+    refreshUnread();
+    const unsubscribe = subscribeAdminChatInbox(user.organizationId, () => {
+      refreshUnread();
+    });
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshUnread();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!user || user.role !== 'admin' || !user.organizationId) return;
@@ -1210,8 +1245,18 @@ export function AdminPreviewPage() {
       <PreviewTopBar>
         <TopBarTitle>Admin Paneli</TopBarTitle>
         <TopBarActions>
-          <ChatGlowButton as={Link} to="/app/admin/chat">
+          <ChatGlowButton as={Link} to="/app/admin/chat" $active={chatUnreadTotal > 0}>
             Sohbet
+            <ChatUnreadBadge
+              $active={chatUnreadTotal > 0}
+              aria-label={
+                chatUnreadTotal === 0
+                  ? 'Okunmamış sohbet yok'
+                  : `${chatUnreadTotal} öğrencide okunmamış mesaj`
+              }
+            >
+              {chatUnreadTotal > 99 ? '99+' : chatUnreadTotal}
+            </ChatUnreadBadge>
           </ChatGlowButton>
         </TopBarActions>
         <TopBarEnd>

@@ -62,6 +62,23 @@ export type ChatThread = {
   studentId: string;
   organizationId: string;
   lastMessageAt: string | null;
+  lastMessagePreview: string | null;
+  lastMessageType: ChatMessageType | null;
+  lastSenderId: string | null;
+  adminLastReadAt: string | null;
+  adminUnreadCount: number;
+};
+
+/** Admin chat sidebar row (student + optional thread inbox fields). */
+export type AdminChatInboxItem = {
+  studentId: string;
+  studentName: string;
+  threadId: string | null;
+  lastMessageAt: string | null;
+  lastMessagePreview: string | null;
+  lastMessageType: ChatMessageType | null;
+  lastSenderId: string | null;
+  unreadCount: number;
 };
 
 export type ChatMessage = {

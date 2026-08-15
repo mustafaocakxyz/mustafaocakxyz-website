@@ -71,6 +71,11 @@ export type DbChatThread = {
   organization_id: string;
   student_id: string;
   last_message_at: string | null;
+  last_message_preview?: string | null;
+  last_message_type?: 'text' | 'image' | 'document' | 'voice' | 'system' | null;
+  last_sender_id?: string | null;
+  admin_last_read_at?: string | null;
+  admin_unread_count?: number;
   created_at: string;
   updated_at: string;
 };

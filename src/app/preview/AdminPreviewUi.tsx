@@ -92,19 +92,46 @@ export const TopBarIconButton = styled(TopBarButton)`
   flex-shrink: 0;
 `;
 
-/** Orange CTA for chat entry in the top bar. */
-export const ChatGlowButton = styled(TopBarButton)`
-  border-color: rgba(234, 88, 12, 0.65);
-  background: #ea580c;
-  color: #fff7ed;
-  font-weight: 800;
-  box-shadow: none;
+/** Chat entry in the top bar; fills orange when there are unread threads. */
+export const ChatGlowButton = styled(TopBarButton)<{ $active?: boolean }>`
+  gap: 8px;
+  ${({ $active }) =>
+    $active
+      ? css`
+          border-color: rgba(251, 146, 60, 0.85);
+          background: #ea580c;
+          color: #fff7ed;
+          font-weight: 800;
+          box-shadow:
+            0 0 0 1px rgba(234, 88, 12, 0.35),
+            0 0 18px rgba(249, 115, 22, 0.55);
 
-  &:hover {
-    border-color: rgba(251, 146, 60, 0.85);
-    background: #f97316;
-    color: #ffffff;
-  }
+          &:hover {
+            border-color: rgba(253, 186, 116, 0.95);
+            background: #f97316;
+            color: #ffffff;
+          }
+        `
+      : ''}
+`;
+
+export const ChatUnreadBadge = styled.span<{ $active?: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  border: 1px solid
+    ${({ $active }) => ($active ? 'rgba(255, 247, 237, 0.55)' : t.borderStrong)};
+  background: ${({ $active }) => ($active ? '#fff7ed' : t.panel)};
+  color: ${({ $active }) => ($active ? '#9a3412' : t.muted)};
+  box-shadow: ${({ $active }) =>
+    $active ? '0 0 10px rgba(255, 247, 237, 0.35)' : 'none'};
 `;
 
 export const TopBarEnd = styled.div`

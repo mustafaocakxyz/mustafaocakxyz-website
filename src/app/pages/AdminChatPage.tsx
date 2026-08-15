@@ -5,11 +5,13 @@ import {
   chatAttachmentFileName,
   createChatAttachmentSignedUrl,
   ensureChatThread,
-  fetchAllActiveStudents,
+  fetchAdminChatInbox,
   fetchChatMessages,
+  markChatThreadRead,
   prefetchChatAttachmentUrls,
   sendChatAttachmentMessage,
   sendChatTextMessage,
+  subscribeAdminChatInbox,
   subscribeChatMessages,
 } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
@@ -25,14 +27,12 @@ import {
   PreviewShell,
   PreviewTopBar,
   SidebarTitle,
-  StudentCardButton,
-  StudentName,
   TopBarActions,
   TopBarButton,
   TopBarEnd,
   TopBarTitle,
 } from '../preview/AdminPreviewUi';
-import type { ChatMessage, StudentSummary } from '../types';
+import type { AdminChatInboxItem, ChatMessage, ChatMessageType } from '../types';
 import { getCachedChatSignedUrlSync } from '../utils/chatSignedUrlCache';
 
 const CHAT_STAGE_HEIGHT = 'calc(100dvh - 200px)';
@@ -79,7 +79,7 @@ const StudentList = styled.div`
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   padding-right: 2px;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -89,6 +89,94 @@ const StudentList = styled.div`
     height: 0;
     display: none;
   }
+`;
+
+const InboxRow = styled.button<{ $selected: boolean }>`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: ${t.radiusMd};
+  border: 1px solid ${({ $selected }) => ($selected ? 'rgba(96, 165, 250, 0.55)' : t.border)};
+  background: ${({ $selected }) => ($selected ? 'rgba(59, 130, 246, 0.14)' : t.panel2)};
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: ${({ $selected }) =>
+    $selected ? '0 0 0 1px rgba(96, 165, 250, 0.2), 0 0 16px rgba(59, 130, 246, 0.22)' : 'none'};
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: rgba(96, 165, 250, 0.4);
+  }
+`;
+
+const InboxMain = styled.div`
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const InboxTop = styled.div`
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+`;
+
+const InboxName = styled.span<{ $unread: boolean }>`
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: ${({ $unread }) => ($unread ? 800 : 700)};
+  font-size: 0.92rem;
+  line-height: 1.3;
+  color: ${t.text};
+`;
+
+const InboxTime = styled.span<{ $unread: boolean }>`
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: ${({ $unread }) => ($unread ? 700 : 500)};
+  color: ${({ $unread }) => ($unread ? 'rgba(134, 239, 172, 0.95)' : t.mutedSoft)};
+`;
+
+const InboxBottom = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+`;
+
+const InboxPreview = styled.span<{ $unread: boolean }>`
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  font-weight: ${({ $unread }) => ($unread ? 600 : 400)};
+  color: ${({ $unread }) => ($unread ? t.text : t.muted)};
+`;
+
+const UnreadBadge = styled.span`
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #25d366;
+  color: #052e16;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
 `;
 
 const ChatPanel = styled(ContentCard)`
@@ -342,6 +430,84 @@ function formatClock(iso: string): string {
   }).format(new Date(iso));
 }
 
+function formatInboxTime(iso: string | null): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startMsg = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayDiff = Math.round((startToday.getTime() - startMsg.getTime()) / 86400000);
+  if (dayDiff === 0) {
+    return new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit' }).format(date);
+  }
+  if (dayDiff === 1) return 'Dün';
+  if (dayDiff < 7) {
+    return new Intl.DateTimeFormat('tr-TR', { weekday: 'short' }).format(date);
+  }
+  return new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(date);
+}
+
+function previewLabel(
+  item: Pick<AdminChatInboxItem, 'lastMessagePreview' | 'lastMessageType' | 'lastSenderId'>,
+  currentUserId: string,
+): string {
+  const raw = (item.lastMessagePreview ?? '').trim();
+  if (!raw && !item.lastMessageType) return 'Henüz mesaj yok';
+  const body =
+    raw ||
+    (item.lastMessageType === 'image'
+      ? 'Fotoğraf'
+      : item.lastMessageType === 'document'
+        ? 'Belge'
+        : item.lastMessageType === 'voice'
+          ? 'Sesli mesaj'
+          : item.lastMessageType === 'system'
+            ? 'Sistem'
+            : '');
+  if (item.lastSenderId === currentUserId) return `Sen: ${body}`;
+  return body;
+}
+
+function sortInbox(items: AdminChatInboxItem[]): AdminChatInboxItem[] {
+  return [...items].sort((a, b) => {
+    if (a.lastMessageAt && b.lastMessageAt) {
+      if (a.lastMessageAt !== b.lastMessageAt) {
+        return a.lastMessageAt < b.lastMessageAt ? 1 : -1;
+      }
+    } else if (a.lastMessageAt) {
+      return -1;
+    } else if (b.lastMessageAt) {
+      return 1;
+    }
+    return a.studentName.localeCompare(b.studentName, 'tr');
+  });
+}
+
+function inboxPreviewFromMessage(
+  message: ChatMessage,
+  currentUserId: string,
+): Pick<
+  AdminChatInboxItem,
+  'lastMessageAt' | 'lastMessagePreview' | 'lastMessageType' | 'lastSenderId'
+> {
+  const type: ChatMessageType = message.messageType;
+  let preview = (message.body ?? '').trim();
+  if (!preview) {
+    if (type === 'image') preview = 'Fotoğraf';
+    else if (type === 'document') preview = 'Belge';
+    else if (type === 'voice') preview = 'Sesli mesaj';
+    else if (type === 'system') preview = 'Sistem';
+  } else if (preview.length > 120) {
+    preview = preview.slice(0, 120);
+  }
+  return {
+    lastMessageAt: message.createdAt,
+    lastMessagePreview: preview,
+    lastMessageType: type,
+    lastSenderId: message.senderId ?? currentUserId,
+  };
+}
+
 function formatAudioMs(ms: number): string {
   const totalSec = Math.max(0, Math.round(ms / 1000));
   const min = Math.floor(totalSec / 60);
@@ -476,7 +642,7 @@ function MessageAttachment({ message }: { message: ChatMessage }) {
 
 export function AdminChatPage() {
   const { user, isLoading } = useAppAuth();
-  const [students, setStudents] = useState<StudentSummary[]>([]);
+  const [inbox, setInbox] = useState<AdminChatInboxItem[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -492,16 +658,69 @@ export function AdminChatPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<BlobPart[]>([]);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const selectedStudentIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    selectedStudentIdRef.current = selectedStudentId;
+  }, [selectedStudentId]);
+
+  const patchInboxFromThread = (
+    thread: {
+      id: string;
+      studentId: string;
+      lastMessageAt: string | null;
+      lastMessagePreview: string | null;
+      lastMessageType: ChatMessageType | null;
+      lastSenderId: string | null;
+      adminUnreadCount: number;
+    },
+  ) => {
+    setInbox((current) =>
+      sortInbox(
+        current.map((item) =>
+          item.studentId === thread.studentId
+            ? {
+                ...item,
+                threadId: thread.id,
+                lastMessageAt: thread.lastMessageAt,
+                lastMessagePreview: thread.lastMessagePreview,
+                lastMessageType: thread.lastMessageType,
+                lastSenderId: thread.lastSenderId,
+                unreadCount:
+                  selectedStudentIdRef.current === thread.studentId ? 0 : thread.adminUnreadCount,
+              }
+            : item,
+        ),
+      ),
+    );
+  };
+
+  const patchInboxFromMessage = (message: ChatMessage, studentId: string, asRead: boolean) => {
+    const preview = inboxPreviewFromMessage(message, user?.id ?? '');
+    setInbox((current) =>
+      sortInbox(
+        current.map((item) => {
+          if (item.studentId !== studentId) return item;
+          return {
+            ...item,
+            threadId: message.threadId,
+            ...preview,
+            unreadCount: asRead ? 0 : item.unreadCount,
+          };
+        }),
+      ),
+    );
+  };
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     let mounted = true;
     setPageLoading(true);
-    void fetchAllActiveStudents()
+    void fetchAdminChatInbox()
       .then((rows) => {
         if (!mounted) return;
-        setStudents(rows);
-        if (rows.length > 0) setSelectedStudentId(rows[0].id);
+        setInbox(rows);
+        // Do not auto-open a conversation — that would mark it read and hide unread badges.
       })
       .catch(() => {
         if (mounted) setError('Öğrenciler yüklenemedi.');
@@ -512,6 +731,13 @@ export function AdminChatPage() {
     return () => {
       mounted = false;
     };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+    return subscribeAdminChatInbox(user.organizationId, (thread) => {
+      patchInboxFromThread(thread);
+    });
   }, [user]);
 
   useEffect(() => {
@@ -534,6 +760,20 @@ export function AdminChatPage() {
         if (!mounted) return;
         setMessages(rows);
         void prefetchChatAttachmentUrls(rows.map((row) => row.attachmentPath));
+
+        try {
+          const read = await markChatThreadRead(thread.id);
+          if (mounted) patchInboxFromThread(read);
+        } catch {
+          setInbox((current) =>
+            sortInbox(
+              current.map((item) =>
+                item.studentId === selectedStudentId ? { ...item, unreadCount: 0 } : item,
+              ),
+            ),
+          );
+        }
+
         unsubscribe = subscribeChatMessages(thread.id, (message) => {
           setMessages((current) => {
             if (current.some((entry) => entry.id === message.id)) return current;
@@ -541,6 +781,10 @@ export function AdminChatPage() {
           });
           if (message.attachmentPath) {
             void prefetchChatAttachmentUrls([message.attachmentPath]);
+          }
+          if (selectedStudentIdRef.current === selectedStudentId) {
+            patchInboxFromMessage(message, selectedStudentId, true);
+            void markChatThreadRead(thread.id).then((read) => patchInboxFromThread(read));
           }
         });
       } catch {
@@ -577,13 +821,16 @@ export function AdminChatPage() {
   if (!user) return <Navigate to="/app" replace />;
   if (user.role !== 'admin') return <Navigate to="/app/student" replace />;
 
-  const selectedStudent = students.find((s) => s.id === selectedStudentId) ?? null;
+  const selectedStudent = inbox.find((s) => s.studentId === selectedStudentId) ?? null;
 
   const appendMessage = (message: ChatMessage) => {
     setMessages((current) => {
       if (current.some((entry) => entry.id === message.id)) return current;
       return [...current, message];
     });
+    if (selectedStudentId) {
+      patchInboxFromMessage(message, selectedStudentId, true);
+    }
   };
 
   const handleSend = async (event: FormEvent) => {
@@ -729,22 +976,40 @@ export function AdminChatPage() {
             <ChatSidebar>
               <SidebarTitle>Öğrenciler</SidebarTitle>
               <StudentList>
-                {students.map((student) => (
-                  <StudentCardButton
-                    key={student.id}
-                    type="button"
-                    $selected={student.id === selectedStudentId}
-                    onClick={() => setSelectedStudentId(student.id)}
-                  >
-                    <StudentName>{student.name}</StudentName>
-                  </StudentCardButton>
-                ))}
+                {inbox.map((item) => {
+                  const unread = item.unreadCount > 0;
+                  return (
+                    <InboxRow
+                      key={item.studentId}
+                      type="button"
+                      $selected={item.studentId === selectedStudentId}
+                      onClick={() => setSelectedStudentId(item.studentId)}
+                    >
+                      <InboxMain>
+                        <InboxTop>
+                          <InboxName $unread={unread}>{item.studentName}</InboxName>
+                          <InboxTime $unread={unread}>{formatInboxTime(item.lastMessageAt)}</InboxTime>
+                        </InboxTop>
+                        <InboxBottom>
+                          <InboxPreview $unread={unread}>
+                            {previewLabel(item, user.id)}
+                          </InboxPreview>
+                          {unread ? (
+                            <UnreadBadge>
+                              {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                            </UnreadBadge>
+                          ) : null}
+                        </InboxBottom>
+                      </InboxMain>
+                    </InboxRow>
+                  );
+                })}
               </StudentList>
             </ChatSidebar>
 
             <ChatPanel>
               <ChatPanelHead>
-                <ContentTitle>{selectedStudent?.name ?? 'Öğrenci seç'}</ContentTitle>
+                <ContentTitle>{selectedStudent?.studentName ?? 'Öğrenci seç'}</ContentTitle>
                 {chatLoading ? <LoadingText>Sohbet yükleniyor...</LoadingText> : null}
               </ChatPanelHead>
               <MessageList ref={listRef}>
