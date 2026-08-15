@@ -6,6 +6,7 @@ export type DenemeTypeId =
   | 'tyt_geometri'
   | 'tyt_matematik'
   | 'tyt_fen'
+  | 'tyt_sosyal'
   | 'tyt_genel';
 
 /** How D/Y/B are entered for a leaf. Future types use one of these. */
@@ -110,6 +111,17 @@ export const DENEME_TYPES: DenemeTypeDef[] = [
       { id: 'fizik', label: 'Fizik', entryMode: 'capped', questionCount: 7 },
       { id: 'kimya', label: 'Kimya', entryMode: 'capped', questionCount: 7 },
       { id: 'biyoloji', label: 'Biyoloji', entryMode: 'capped', questionCount: 6 },
+    ],
+    topicPresets: [],
+  },
+  {
+    id: 'tyt_sosyal',
+    label: 'TYT Sosyal',
+    leaves: [
+      { id: 'tarih', label: 'Tarih', entryMode: 'capped', questionCount: 5 },
+      { id: 'cografya', label: 'Coğrafya', entryMode: 'capped', questionCount: 5 },
+      { id: 'felsefe', label: 'Felsefe', entryMode: 'capped', questionCount: 5 },
+      { id: 'din', label: 'Din', entryMode: 'capped', questionCount: 5 },
     ],
     topicPresets: [],
   },
