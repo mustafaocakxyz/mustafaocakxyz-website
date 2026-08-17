@@ -7,6 +7,7 @@ import {
   GraduationCap,
   Map,
   Repeat,
+  Target,
   UserCheck,
   Video,
 } from 'lucide-react';
@@ -113,6 +114,12 @@ export const GELISIM_PROGRAM_SECTIONS: ProgramSectionConfig[] = [
     variant: 'icon-bordered',
     title: 'Sistemimiz Neden Farklı?',
     items: [
+      {
+        icon: Target,
+        text: 'Disiplin Merkezli ve Hedef Odaklı',
+        subtext:
+          'Hedefinizi sizin kadar ciddiye alıyor ve bu hedefe ulaşmanız için gereken disiplini sağlamaya özen gösteriyoruz. Hedefimiz hiçbir günü ıskalamamak ve istikrarı daima korumak.',
+      },
       {
         icon: Bell,
         text: 'Sistemli İletişim',
