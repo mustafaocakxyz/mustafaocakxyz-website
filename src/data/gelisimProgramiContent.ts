@@ -7,6 +7,7 @@ import {
   GraduationCap,
   Map,
   Repeat,
+  UserCheck,
   Video,
 } from 'lucide-react';
 import type { ProgramIconItem, ProgramItem } from '../components/gelisim/types';
@@ -37,22 +38,27 @@ export const GELISIM_SECTION_CTA: SectionCta = {
 export const GELISIM_PROGRAM_SECTIONS: ProgramSectionConfig[] = [
   {
     variant: 'icon-bordered',
-    title: "Gelişim Programı'nda neler var?",
+    title: 'Aylık Koçlukta neler var?',
     items: [
       {
+        icon: UserCheck,
+        text: "Bizzat Mustafa Ocak'tan birebir koçluk",
+        subtext: 'Tanımadığın bir derece öğrencisinden değil, kurucu koçtan koçluk al',
+      },
+      {
         icon: Map,
-        text: 'İlk görüşmede 12 aylık yol haritan hazır',
+        text: 'İlk görüşmede YKS2027 yol haritan hazır',
         subtext: 'Hedefimiz ve yönümüz belli',
       },
       {
         icon: CalendarDays,
-        text: 'Önümüzdeki 14 gün her zaman belli',
+        text: 'Günlük ve haftalık programların her zaman belli',
         subtext: 'Hiçbir zaman ‘Bugün ne çalışacaktım?’ belirsizliği yaşanmayacak',
       },
       {
         icon: BarChart3,
-        text: 'Günlük / Haftalık / Aylık gelişim raporları',
-        subtext: 'Sürecini her detayıyla ve sürekli takip edeceğiz',
+        text: 'En İnce Detayına Kadar',
+        subtext: 'Klasik ve genel programlar değil, sana özel ve detaylı programlar',
       },
       {
         icon: Video,
@@ -94,7 +100,7 @@ export const GELISIM_PROGRAM_SECTIONS: ProgramSectionConfig[] = [
       },
       {
         text: 'İlk Görüşme',
-        subtext: 'Tanışıyoruz ve 12 aylık yol haritanı hazırlıyoruz.',
+        subtext: 'Tanışıyoruz ve YKS2027 yol haritanı hazırlıyoruz.',
       },
       {
         text: 'Süreç Başlıyor',
@@ -115,18 +121,18 @@ export const GELISIM_PROGRAM_SECTIONS: ProgramSectionConfig[] = [
       },
       {
         icon: CalendarClock,
-        text: 'Gerektiğinde Görüşme ✅',
+        text: 'Gerektiğinde Görüşme',
         subtext: 'Takvimin belli vakitlerinde değil, karar verilmesi gerektiğinde görüşüyoruz.',
       },
       {
         icon: Repeat,
-        text: 'İstikrarlı Çalışma ✅',
+        text: 'İstikrarlı Çalışma',
         subtext:
           'Başarı sürekli plan yaparak değil var olan planı uygulayarak elde edilir. Bu yüzden orijinal programımıza sadık kalıyoruz. Eksiklikleri ve problemleri daha fazla çalışarak telafi ediyoruz.',
       },
       {
         icon: Bot,
-        text: 'Teknoloji ✅',
+        text: 'Teknoloji',
         subtext:
           'Her öğrenci için ayrı bir yazılım ve yapay zeka altyapısı kullanıyoruz ve süreç boyunca bu altyapılardan faydalanıyoruz.',
       },

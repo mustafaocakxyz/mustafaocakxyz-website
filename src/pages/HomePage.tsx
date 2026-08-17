@@ -34,7 +34,7 @@ export function HomePage() {
           to="/gelisim-programi"
           title="YKS & Maarif Koçluk"
           price="5900₺ / ay"
-          description="Sürecini Mustafa Ocak ile birlikte götürmek isteyenler için. Aylık olarak tekrarlanır."
+          description="Sürecini Mustafa Ocak ile birlikte götürmek isteyenler için."
           theme="orange"
           delay="0.6s"
         />
