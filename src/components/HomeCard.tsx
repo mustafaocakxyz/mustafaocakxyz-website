@@ -108,12 +108,23 @@ const CardDescription = styled.p`
   }
 `;
 
+const CardActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+`;
+
 const CardCta = styled(Link)<{ $theme: ThemeColor }>`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  align-self: flex-start;
-  margin-top: 8px;
   padding: 12px 22px;
   border-radius: 30px;
   background: ${({ $theme }) => themeStyles[$theme].buttonGradient};
@@ -135,12 +146,74 @@ const CardCta = styled(Link)<{ $theme: ThemeColor }>`
   }
 `;
 
+const CapacityPill = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(239, 68, 68, 0.16);
+  color: rgba(254, 202, 202, 0.98);
+  font-size: 0.92rem;
+  font-weight: 800;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  user-select: none;
+
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+`;
+
+const CapacityDotWrap = styled.span`
+  position: relative;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const CapacityDotCore = styled.span`
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.75);
+  z-index: 1;
+`;
+
+const CapacityDotPulse = styled.span`
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(248, 113, 113, 0.5);
+  animation: capacityPillBreath 1.8s ease-in-out infinite;
+
+  @keyframes capacityPillBreath {
+    0%,
+    100% {
+      transform: scale(0.85);
+      opacity: 0.7;
+    }
+    50% {
+      transform: scale(2.1);
+      opacity: 0;
+    }
+  }
+`;
+
 type HomeCardProps = {
   to: string;
   title: string;
   price: string;
   description: string;
   ctaLabel?: string;
+  capacityPill?: string;
   theme: ThemeColor;
   delay?: string;
 };
@@ -151,6 +224,7 @@ export function HomeCard({
   price,
   description,
   ctaLabel = 'Detayları Gör',
+  capacityPill,
   theme,
   delay = '0.6s',
 }: HomeCardProps) {
@@ -159,9 +233,20 @@ export function HomeCard({
       <CardTitle>{title}</CardTitle>
       <CardPrice $theme={theme}>{price}</CardPrice>
       <CardDescription>{description}</CardDescription>
-      <CardCta $theme={theme} to={to}>
-        {ctaLabel}
-      </CardCta>
+      <CardActions>
+        <CardCta $theme={theme} to={to}>
+          {ctaLabel}
+        </CardCta>
+        {capacityPill ? (
+          <CapacityPill>
+            <CapacityDotWrap aria-hidden>
+              <CapacityDotPulse />
+              <CapacityDotCore />
+            </CapacityDotWrap>
+            {capacityPill}
+          </CapacityPill>
+        ) : null}
+      </CardActions>
     </Card>
   );
 }

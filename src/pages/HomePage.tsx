@@ -35,6 +35,7 @@ export function HomePage() {
           title="YKS & Maarif Koçluk"
           price="6900₺ / ay"
           description="Sürecini Mustafa Ocak ile birlikte götürmek isteyenler için."
+          capacityPill="KONTENJAN DOLU (24/24)"
           theme="orange"
           delay="0.6s"
         />
