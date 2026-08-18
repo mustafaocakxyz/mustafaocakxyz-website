@@ -33,7 +33,7 @@ export function HomePage() {
         <HomeCard
           to="/gelisim-programi"
           title="YKS & Maarif Koçluk"
-          price="5900₺ / ay"
+          price="6900₺ / ay"
           description="Sürecini Mustafa Ocak ile birlikte götürmek isteyenler için."
           theme="orange"
           delay="0.6s"

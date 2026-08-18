@@ -1,6 +1,8 @@
 import { GradientTitle } from '../components/GradientTitle';
 import {
+  /* Restore when applications reopen:
   PaymentActionRouterLink,
+  */
   PaymentContent,
   PaymentOptionCard,
   PaymentOptionLabel,
@@ -34,7 +36,6 @@ const Description = styled.p`
   }
 `;
 
-/* Restore when applications are closed:
 const DisabledActionButton = styled.span`
   display: inline-flex;
   align-items: center;
@@ -57,14 +58,13 @@ const DisabledActionButton = styled.span`
     width: 100%;
   }
 `;
-*/
 
 export function GelisimProgramiBasvuruIntroPage() {
   return (
     <DetailLayout>
       <GradientTitle $detail>Gelişim Programı</GradientTitle>
       <PaymentContent>
-        <ProductSubtitle $theme="orange">Ücret: 5900₺ / ay</ProductSubtitle>
+        <ProductSubtitle $theme="orange">Ücret: 6900₺ / ay</ProductSubtitle>
 
         <Description>
           Başvurusu kabul edilen öğrenciler ödeme için yönlendirileceklerdir.
@@ -78,12 +78,12 @@ export function GelisimProgramiBasvuruIntroPage() {
 
         <PaymentOptionCard $theme="orange" $delay="0.6s">
           <PaymentOptionLabel>Başvurunu Yap</PaymentOptionLabel>
+          {/* Restore when applications reopen:
           <PaymentActionRouterLink $theme="orange" to="/gelisim-programi/basvuru">
             Formu Doldur
           </PaymentActionRouterLink>
-          {/* Closed-capacity CTA — restore when applications close:
-          <DisabledActionButton>Kontenjan Dolu</DisabledActionButton>
           */}
+          <DisabledActionButton>Kontenjan Dolu</DisabledActionButton>
         </PaymentOptionCard>
       </PaymentContent>
     </DetailLayout>
