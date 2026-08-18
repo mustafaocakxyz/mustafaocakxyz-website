@@ -21,7 +21,7 @@ const GridItem = styled.li`
   padding: 22px 22px 22px 26px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 138, 101, 0.18);
+  border: 1px solid rgba(66, 165, 245, 0.18);
   position: relative;
   overflow: hidden;
 
@@ -32,7 +32,7 @@ const GridItem = styled.li`
     top: 0;
     bottom: 0;
     width: 4px;
-    background: linear-gradient(180deg, #f57c00 0%, #e64a19 50%, #bf360c 100%);
+    background: linear-gradient(180deg, #42a5f5 0%, #1976d2 50%, #1565c0 100%);
   }
 `;
 

@@ -17,7 +17,7 @@ const BorderedItem = styled.li`
   padding: 22px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 138, 101, 0.18);
+  border: 1px solid rgba(66, 165, 245, 0.18);
 
   @media (max-width: 480px) {
     grid-template-columns: 44px 1fr;
@@ -34,8 +34,8 @@ const IconCircle = styled.span`
   align-items: center;
   justify-content: center;
   color: white;
-  background: linear-gradient(135deg, #bf360c 0%, #e64a19 50%, #f57c00 100%);
-  box-shadow: 0 6px 20px rgba(216, 67, 21, 0.35);
+  background: linear-gradient(135deg, #1565c0 0%, #1976d2 50%, #42a5f5 100%);
+  box-shadow: 0 6px 20px rgba(21, 101, 192, 0.35);
   flex-shrink: 0;
   align-self: start;
 

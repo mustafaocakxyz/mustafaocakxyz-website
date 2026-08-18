@@ -25,14 +25,14 @@ const Wrap = styled.div`
 `;
 
 const Back = styled(Link)`
-  color: rgba(255, 171, 145, 0.95);
+  color: rgba(144, 202, 249, 0.95);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 500;
   width: fit-content;
 
   &:hover {
-    color: #ffccbc;
+    color: #90caf9;
   }
 `;
 
@@ -48,15 +48,15 @@ const StudentCard = styled(Link)`
   gap: 12px;
   padding: 20px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 138, 101, 0.35);
+  border: 1px solid rgba(66, 165, 245, 0.35);
   background: linear-gradient(
     145deg,
-    rgba(191, 54, 12, 0.42) 0%,
-    rgba(230, 74, 25, 0.28) 45%,
-    rgba(244, 81, 30, 0.18) 100%
+    rgba(21, 101, 192, 0.42) 0%,
+    rgba(25, 118, 210, 0.28) 45%,
+    rgba(33, 150, 243, 0.18) 100%
   );
   box-shadow:
-    0 10px 28px rgba(191, 54, 12, 0.22),
+    0 10px 28px rgba(21, 101, 192, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   text-decoration: none;
   color: inherit;
@@ -64,9 +64,9 @@ const StudentCard = styled(Link)`
 
   &:hover {
     transform: translateY(-2px);
-    border-color: rgba(255, 171, 145, 0.55);
+    border-color: rgba(144, 202, 249, 0.55);
     box-shadow:
-      0 14px 34px rgba(191, 54, 12, 0.3),
+      0 14px 34px rgba(21, 101, 192, 0.3),
       inset 0 1px 0 rgba(255, 255, 255, 0.12);
   }
 `;
@@ -88,7 +88,7 @@ const Name = styled.h2`
 const Days = styled.span`
   font-size: 0.85rem;
   font-weight: 600;
-  color: rgba(255, 204, 188, 0.85);
+  color: rgba(187, 222, 251, 0.85);
   white-space: nowrap;
 `;
 
@@ -112,7 +112,7 @@ const SoftPill = styled.span`
 
 const CardHint = styled.span`
   font-size: 0.85rem;
-  color: rgba(255, 224, 178, 0.95);
+  color: rgba(187, 222, 251, 0.95);
   font-weight: 600;
 `;
 

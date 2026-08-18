@@ -10,7 +10,7 @@ type TaskListProps = {
   tasks: StudentTask[];
   onToggle?: (taskId: string) => void;
   readOnly?: boolean;
-  /** Public /ogrenciler uses orange; admin/student app stays blue. */
+  /** Public /ogrenciler defaults to blue; admin/student app stays blue. */
   accent?: TaskListAccent;
 };
 

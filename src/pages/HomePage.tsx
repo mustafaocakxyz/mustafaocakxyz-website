@@ -36,7 +36,7 @@ export function HomePage() {
           price="6900₺ / ay"
           description="Sürecini Mustafa Ocak ile birlikte götürmek isteyenler için."
           capacityPill="KONTENJAN DOLU (24/24)"
-          theme="orange"
+          theme="blue"
           delay="0.6s"
         />
         {/* Hidden for now — restore when Tek Seferlik is offered again:

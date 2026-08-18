@@ -29,8 +29,8 @@ const TimelineItem = styled.li`
     width: 2px;
     background: linear-gradient(
       180deg,
-      rgba(244, 81, 30, 0.6) 0%,
-      rgba(244, 81, 30, 0.15) 100%
+      rgba(33, 150, 243, 0.6) 0%,
+      rgba(33, 150, 243, 0.15) 100%
     );
   }
 
@@ -56,8 +56,8 @@ const StepNumber = styled.span`
   font-size: 1.1rem;
   font-weight: 700;
   color: white;
-  background: linear-gradient(135deg, #bf360c 0%, #e64a19 50%, #f57c00 100%);
-  box-shadow: 0 6px 20px rgba(216, 67, 21, 0.35);
+  background: linear-gradient(135deg, #1565c0 0%, #1976d2 50%, #42a5f5 100%);
+  box-shadow: 0 6px 20px rgba(21, 101, 192, 0.35);
   flex-shrink: 0;
 
   @media (max-width: 480px) {

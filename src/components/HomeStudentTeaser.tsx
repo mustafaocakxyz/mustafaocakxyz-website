@@ -10,11 +10,11 @@ const TeaserCard = styled.div`
   gap: 16px;
   padding: 20px 22px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 138, 101, 0.25);
+  border: 1px solid rgba(66, 165, 245, 0.25);
   background: linear-gradient(
     135deg,
-    rgba(191, 54, 12, 0.25) 0%,
-    rgba(230, 74, 25, 0.15) 100%
+    rgba(21, 101, 192, 0.25) 0%,
+    rgba(25, 118, 210, 0.15) 100%
   );
   animation: fadeInUp 0.8s ease-out both;
   animation-delay: 0.45s;
@@ -94,18 +94,18 @@ const TeaserCount = styled.span`
   line-height: 1.3;
 `;
 
-const OrangeButton = styled(Link)`
+const TeaserButton = styled(Link)`
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 12px 20px;
   border-radius: 30px;
-  background: linear-gradient(135deg, #bf360c 0%, #d84315 50%, #e64a19 100%);
+  background: linear-gradient(135deg, #1565c0 0%, #1976d2 50%, #2196f3 100%);
   color: white;
   text-decoration: none;
   font-size: 0.95rem;
   font-weight: 500;
-  box-shadow: 0 8px 25px rgba(216, 67, 21, 0.3);
+  box-shadow: 0 8px 25px rgba(21, 101, 192, 0.3);
   white-space: nowrap;
 
   @media (max-width: 600px) {
@@ -136,7 +136,7 @@ export function HomeStudentTeaser({
         </LiveDotWrap>
         <TeaserCount>{label}</TeaserCount>
       </TeaserLeft>
-      <OrangeButton to={detailsTo}>Detaylarını Gör</OrangeButton>
+      <TeaserButton to={detailsTo}>Detaylarını Gör</TeaserButton>
     </TeaserCard>
   );
 }

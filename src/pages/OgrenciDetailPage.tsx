@@ -28,7 +28,7 @@ const Wrap = styled.div`
 `;
 
 const Back = styled(Link)`
-  color: rgba(255, 171, 145, 0.95);
+  color: rgba(144, 202, 249, 0.95);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 500;
@@ -50,7 +50,7 @@ const StudentTitle = styled(GradientTitle)`
 const Days = styled.p`
   margin: 0;
   text-align: center;
-  color: #ff8a65;
+  color: #42a5f5;
   font-size: 1.35rem;
   font-weight: 600;
 
@@ -62,15 +62,15 @@ const Days = styled.p`
 const Panel = styled.section`
   padding: 20px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 138, 101, 0.35);
+  border: 1px solid rgba(66, 165, 245, 0.35);
   background: linear-gradient(
     145deg,
-    rgba(191, 54, 12, 0.4) 0%,
-    rgba(230, 74, 25, 0.26) 50%,
-    rgba(244, 81, 30, 0.16) 100%
+    rgba(21, 101, 192, 0.4) 0%,
+    rgba(25, 118, 210, 0.26) 50%,
+    rgba(33, 150, 243, 0.16) 100%
   );
   box-shadow:
-    0 10px 28px rgba(191, 54, 12, 0.2),
+    0 10px 28px rgba(21, 101, 192, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
@@ -87,7 +87,7 @@ const PanelTitle = styled.h2`
   font-size: 0.9rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 204, 188, 0.8);
+  color: rgba(187, 222, 251, 0.8);
 `;
 
 /* Restored with the stats card:
@@ -229,7 +229,7 @@ export function OgrenciDetailPage() {
 
         <Panel>
           <PanelTitle>Bugünkü program</PanelTitle>
-          <TaskList tasks={tasks} readOnly accent="orange" />
+          <TaskList tasks={tasks} readOnly accent="blue" />
         </Panel>
       </Wrap>
     </Shell>

@@ -64,7 +64,7 @@ export function GelisimProgramiBasvuruIntroPage() {
     <DetailLayout>
       <GradientTitle $detail>Gelişim Programı</GradientTitle>
       <PaymentContent>
-        <ProductSubtitle $theme="orange">Ücret: 6900₺ / ay</ProductSubtitle>
+        <ProductSubtitle $theme="blue">Ücret: 6900₺ / ay</ProductSubtitle>
 
         <Description>
           Başvurusu kabul edilen öğrenciler ödeme için yönlendirileceklerdir.
@@ -76,10 +76,10 @@ export function GelisimProgramiBasvuruIntroPage() {
         </Description>
         */}
 
-        <PaymentOptionCard $theme="orange" $delay="0.6s">
+        <PaymentOptionCard $theme="blue" $delay="0.6s">
           <PaymentOptionLabel>Başvurunu Yap</PaymentOptionLabel>
           {/* Restore when applications reopen:
-          <PaymentActionRouterLink $theme="orange" to="/gelisim-programi/basvuru">
+          <PaymentActionRouterLink $theme="blue" to="/gelisim-programi/basvuru">
             Formu Doldur
           </PaymentActionRouterLink>
           */}
