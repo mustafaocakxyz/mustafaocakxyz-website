@@ -26,6 +26,11 @@ export function HomePage() {
     };
   }, []);
 
+  const capacityPill =
+    studentCount === null
+      ? 'KONTENJAN DOLUYOR … / 30'
+      : `KONTENJAN DOLUYOR ${studentCount} / 30`;
+
   return (
     <HomeLayout>
       <GradientTitle>Hoş geldin</GradientTitle>
@@ -35,7 +40,7 @@ export function HomePage() {
           title="YKS & Maarif Koçluk"
           price="6900₺ / ay"
           description="Sürecini Mustafa Ocak ile birlikte götürmek isteyenler için."
-          capacityPill="KONTENJAN DOLU (24/24)"
+          capacityPill={capacityPill}
           theme="blue"
           delay="0.6s"
         />
