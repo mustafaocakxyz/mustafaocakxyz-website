@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Settings, Table2, Video } from 'lucide-react';
+import { Download, Library, Settings, Table2, Video } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import {
@@ -1268,6 +1268,14 @@ export function AdminPreviewPage() {
             onClick={() => void handleExportOrganization()}
           >
             <Download size={16} strokeWidth={2.4} />
+          </TopBarIconButton>
+          <TopBarIconButton
+            as={Link}
+            to="/app/admin/library"
+            title="Kütüphane"
+            aria-label="Kütüphane"
+          >
+            <Library size={16} strokeWidth={2.4} />
           </TopBarIconButton>
           <TopBarIconButton
             as={Link}

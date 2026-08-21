@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppAuthProvider } from './AppAuthContext';
 import { AdminChatPage } from './pages/AdminChatPage';
+import { AdminLibraryPage } from './pages/AdminLibraryPage';
 import { AdminPreviewPage } from './pages/AdminPreviewPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminShowcasePage } from './pages/AdminShowcasePage';
@@ -24,6 +25,7 @@ export function AppRoutes() {
         <Route path="admin/preview" element={<Navigate to="/app/admin" replace />} />
         <Route path="admin/settings" element={<AdminSettingsPage />} />
         <Route path="admin/tea" element={<AdminTeaPage />} />
+        <Route path="admin/library" element={<AdminLibraryPage />} />
         <Route path="admin/showcase" element={<AdminShowcasePage />} />
         <Route path="admin/chat" element={<AdminChatPage />} />
         <Route path="*" element={<Navigate to="/app" replace />} />
