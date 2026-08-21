@@ -180,7 +180,7 @@ const HiddenChip = styled.button`
 `;
 
 export function AdminTeaPage() {
-  const { user, loading } = useAppAuth();
+  const { user, isLoading } = useAppAuth();
   const [students, setStudents] = useState<StudentSummary[]>([]);
   const [taskPresence, setTaskPresence] = useState<Record<string, Record<string, boolean>>>({});
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
@@ -280,7 +280,7 @@ export function AdminTeaPage() {
     });
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <PreviewShell>
         <PreviewBody>
