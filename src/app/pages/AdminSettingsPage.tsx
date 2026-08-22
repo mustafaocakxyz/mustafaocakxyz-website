@@ -3,11 +3,16 @@ import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
   fetchStudentAdminSettings,
+  updateStudentEarningsContribution,
   updateStudentSetting,
   type StudentSettingKey,
 } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
-import type { StudentAdminSettings } from '../types';
+import type {
+  EarningsContribution,
+  StudentAdminSettings,
+} from '../types';
+import { earningsContributionLabel, nextEarningsContribution } from '../types';
 import { preview as t } from '../preview/adminPreviewTheme';
 import {
   ContentCard,
@@ -133,7 +138,7 @@ const ToggleCluster = styled.div`
   }
 `;
 
-const ToggleChip = styled.button<{ $on: boolean; $busy?: boolean }>`
+const ToggleChip = styled.button<{ $on: boolean; $busy?: boolean; $accent?: 'green' | 'orange' }>`
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -142,8 +147,19 @@ const ToggleChip = styled.button<{ $on: boolean; $busy?: boolean }>`
   min-width: 72px;
   padding: 6px 8px;
   border-radius: 10px;
-  border: 1px solid ${({ $on }) => ($on ? 'rgba(52, 211, 153, 0.45)' : t.border)};
-  background: ${({ $on }) => ($on ? 'rgba(52, 211, 153, 0.14)' : 'rgba(15, 23, 42, 0.45)')};
+  border: 1px solid
+    ${({ $on, $accent }) =>
+      !$on
+        ? t.border
+        : $accent === 'orange'
+          ? 'rgba(251, 146, 60, 0.5)'
+          : 'rgba(52, 211, 153, 0.45)'};
+  background: ${({ $on, $accent }) =>
+    !$on
+      ? 'rgba(15, 23, 42, 0.45)'
+      : $accent === 'orange'
+        ? 'rgba(234, 88, 12, 0.16)'
+        : 'rgba(52, 211, 153, 0.14)'};
   color: ${t.text};
   font: inherit;
   cursor: ${({ $busy }) => ($busy ? 'wait' : 'pointer')};
@@ -166,24 +182,29 @@ const ToggleLabel = styled.span`
   white-space: nowrap;
 `;
 
-const ToggleValue = styled.span<{ $on: boolean }>`
+const ToggleValue = styled.span<{ $on: boolean; $accent?: 'green' | 'orange' }>`
   font-size: 0.72rem;
   font-weight: 800;
-  color: ${({ $on }) => ($on ? t.success : t.mutedSoft)};
+  color: ${({ $on, $accent }) =>
+    !$on ? t.mutedSoft : $accent === 'orange' ? '#fdba74' : t.success};
 `;
 
-const SETTING_ROWS: { key: StudentSettingKey; label: string; title: string }[] = [
+const BOOL_SETTING_ROWS: { key: StudentSettingKey; label: string; title: string }[] = [
   { key: 'showOnAdminDashboard', label: 'Panel', title: 'Admin panelde göster' },
   { key: 'showOnOgrenciler', label: 'Öğrenciler', title: 'Öğrenciler sayfasında göster' },
-  { key: 'countInEarnings', label: 'Kazanç', title: 'Kazanç hesabına dahil' },
   { key: 'dayCountActive', label: 'Gün', title: 'Gün sayacı aktif' },
 ];
 
-function settingValue(student: StudentAdminSettings, key: StudentSettingKey): boolean {
+function boolSettingValue(student: StudentAdminSettings, key: StudentSettingKey): boolean {
   if (key === 'showOnAdminDashboard') return student.showOnAdminDashboard;
   if (key === 'showOnOgrenciler') return student.showOnOgrenciler;
-  if (key === 'countInEarnings') return student.countInEarnings;
   return student.dayCountActive;
+}
+
+function earningsAccent(value: EarningsContribution): 'green' | 'orange' | undefined {
+  if (value === 5000) return 'green';
+  if (value === 6000) return 'orange';
+  return undefined;
 }
 
 export function AdminSettingsPage() {
@@ -203,7 +224,7 @@ export function AdminSettingsPage() {
         const rows = await fetchStudentAdminSettings();
         if (mounted) setStudents(rows);
       } catch {
-        if (mounted) setError('Öğrenci ayarları yüklenemedi. 026 SQL çalıştırıldı mı?');
+        if (mounted) setError('Öğrenci ayarları yüklenemedi. 026/032 SQL çalıştırıldı mı?');
       } finally {
         if (mounted) setPageLoading(false);
       }
@@ -213,10 +234,10 @@ export function AdminSettingsPage() {
     };
   }, [user]);
 
-  const handleToggle = async (studentId: string, key: StudentSettingKey) => {
+  const handleBoolToggle = async (studentId: string, key: StudentSettingKey) => {
     const current = students.find((row) => row.id === studentId);
     if (!current) return;
-    const nextValue = !settingValue(current, key);
+    const nextValue = !boolSettingValue(current, key);
     const token = `${studentId}:${key}`;
     setBusyKey(token);
     setError('');
@@ -225,6 +246,23 @@ export function AdminSettingsPage() {
       setStudents((rows) => rows.map((row) => (row.id === studentId ? updated : row)));
     } catch {
       setError('Ayar kaydedilemedi.');
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleEarningsCycle = async (studentId: string) => {
+    const current = students.find((row) => row.id === studentId);
+    if (!current) return;
+    const nextValue = nextEarningsContribution(current.earningsContribution);
+    const token = `${studentId}:earnings`;
+    setBusyKey(token);
+    setError('');
+    try {
+      const updated = await updateStudentEarningsContribution(studentId, nextValue);
+      setStudents((rows) => rows.map((row) => (row.id === studentId ? updated : row)));
+    } catch {
+      setError('Kazanç ayarı kaydedilemedi. 032 SQL çalıştırıldı mı?');
     } finally {
       setBusyKey(null);
     }
@@ -282,7 +320,7 @@ export function AdminSettingsPage() {
           <ContentCard>
             <ContentTitle>Öğrenci ayarları</ContentTitle>
             <ContentSub>
-              Panel, öğrenciler sayfası, kazanç ve gün sayacı görünürlüğünü öğrenci bazında aç/kapa.
+              Panel / öğrenciler / gün: aç-kapa. Kazanç: Kapalı → 5000 → 6000 (tıkla).
             </ContentSub>
             {error ? <ErrorText>{error}</ErrorText> : null}
             {pageLoading ? <LoadingText>Yükleniyor...</LoadingText> : null}
@@ -290,32 +328,53 @@ export function AdminSettingsPage() {
               <EmptyState>Aktif öğrenci yok.</EmptyState>
             ) : null}
             <StudentSettingsStack>
-              {students.map((student) => (
-                <StudentRow key={student.id}>
-                  <StudentName title={student.name}>{student.name}</StudentName>
-                  <ToggleCluster>
-                    {SETTING_ROWS.map((row) => {
-                      const on = settingValue(student, row.key);
-                      const busy = busyKey === `${student.id}:${row.key}`;
-                      return (
-                        <ToggleChip
-                          key={row.key}
-                          type="button"
-                          $on={on}
-                          $busy={busy}
-                          disabled={busy}
-                          title={row.title}
-                          aria-label={`${student.name}: ${row.title}`}
-                          onClick={() => void handleToggle(student.id, row.key)}
-                        >
-                          <ToggleLabel>{row.label}</ToggleLabel>
-                          <ToggleValue $on={on}>{on ? 'Açık' : 'Kapalı'}</ToggleValue>
-                        </ToggleChip>
-                      );
-                    })}
-                  </ToggleCluster>
-                </StudentRow>
-              ))}
+              {students.map((student) => {
+                const earnings = student.earningsContribution;
+                const earningsOn = earnings > 0;
+                const earningsBusy = busyKey === `${student.id}:earnings`;
+                const accent = earningsAccent(earnings);
+                return (
+                  <StudentRow key={student.id}>
+                    <StudentName title={student.name}>{student.name}</StudentName>
+                    <ToggleCluster>
+                      {BOOL_SETTING_ROWS.map((row) => {
+                        const on = boolSettingValue(student, row.key);
+                        const busy = busyKey === `${student.id}:${row.key}`;
+                        return (
+                          <ToggleChip
+                            key={row.key}
+                            type="button"
+                            $on={on}
+                            $busy={busy}
+                            disabled={busy}
+                            title={row.title}
+                            aria-label={`${student.name}: ${row.title}`}
+                            onClick={() => void handleBoolToggle(student.id, row.key)}
+                          >
+                            <ToggleLabel>{row.label}</ToggleLabel>
+                            <ToggleValue $on={on}>{on ? 'Açık' : 'Kapalı'}</ToggleValue>
+                          </ToggleChip>
+                        );
+                      })}
+                      <ToggleChip
+                        type="button"
+                        $on={earningsOn}
+                        $accent={accent}
+                        $busy={earningsBusy}
+                        disabled={earningsBusy}
+                        title="Kazanç katkısı: Kapalı → 5000 → 6000"
+                        aria-label={`${student.name}: Kazanç ${earningsContributionLabel(earnings)}`}
+                        onClick={() => void handleEarningsCycle(student.id)}
+                      >
+                        <ToggleLabel>Kazanç</ToggleLabel>
+                        <ToggleValue $on={earningsOn} $accent={accent}>
+                          {earningsContributionLabel(earnings)}
+                        </ToggleValue>
+                      </ToggleChip>
+                    </ToggleCluster>
+                  </StudentRow>
+                );
+              })}
             </StudentSettingsStack>
           </ContentCard>
         </PreviewFrame>

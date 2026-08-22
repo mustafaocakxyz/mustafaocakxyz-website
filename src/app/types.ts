@@ -32,10 +32,33 @@ export type StudentSummary = {
   name: string;
 };
 
+export type EarningsContribution = 0 | 5000 | 6000;
+
+export const EARNINGS_CONTRIBUTION_VALUES: EarningsContribution[] = [0, 5000, 6000];
+
+export function nextEarningsContribution(current: EarningsContribution): EarningsContribution {
+  if (current === 0) return 5000;
+  if (current === 5000) return 6000;
+  return 0;
+}
+
+export function earningsContributionLabel(value: EarningsContribution): string {
+  if (value === 0) return 'Kapalı';
+  return String(value);
+}
+
+export function asEarningsContribution(raw: unknown): EarningsContribution {
+  if (raw === 0 || raw === 5000 || raw === 6000) return raw;
+  if (raw === '0' || raw === '5000' || raw === '6000') {
+    return Number(raw) as EarningsContribution;
+  }
+  return 5000;
+}
+
 export type StudentVisibilitySettings = {
   showOnAdminDashboard: boolean;
   showOnOgrenciler: boolean;
-  countInEarnings: boolean;
+  earningsContribution: EarningsContribution;
   dayCountActive: boolean;
   dayCountFrozenDays: number | null;
   dayCountStartDate: string | null;

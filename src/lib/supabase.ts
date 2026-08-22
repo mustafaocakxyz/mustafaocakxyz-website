@@ -20,6 +20,7 @@ export type DbProfile = {
   show_on_admin_dashboard?: boolean;
   show_on_ogrenciler?: boolean;
   count_in_earnings?: boolean;
+  earnings_contribution?: number;
   day_count_active?: boolean;
   day_count_frozen_days?: number | null;
   day_count_start_date?: string | null;

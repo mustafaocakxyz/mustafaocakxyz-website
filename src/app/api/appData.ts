@@ -190,17 +190,27 @@ function mapStudentAdminSettings(row: {
   show_on_admin_dashboard?: boolean | null;
   show_on_ogrenciler?: boolean | null;
   count_in_earnings?: boolean | null;
+  earnings_contribution?: number | null;
   day_count_active?: boolean | null;
   day_count_frozen_days?: number | null;
   day_count_start_date?: string | null;
 }): StudentAdminSettings {
+  const earningsContribution =
+    row.earnings_contribution === 0 ||
+    row.earnings_contribution === 5000 ||
+    row.earnings_contribution === 6000
+      ? row.earnings_contribution
+      : row.count_in_earnings === false
+        ? 0
+        : 5000;
+
   return {
     id: row.id,
     name: row.display_name,
     createdAt: row.created_at,
     showOnAdminDashboard: row.show_on_admin_dashboard !== false,
     showOnOgrenciler: row.show_on_ogrenciler !== false,
-    countInEarnings: row.count_in_earnings !== false,
+    earningsContribution,
     dayCountActive: row.day_count_active !== false,
     dayCountFrozenDays:
       typeof row.day_count_frozen_days === 'number' ? row.day_count_frozen_days : null,
@@ -208,12 +218,13 @@ function mapStudentAdminSettings(row: {
   };
 }
 
+const STUDENT_SETTINGS_SELECT =
+  'id, display_name, created_at, show_on_admin_dashboard, show_on_ogrenciler, count_in_earnings, earnings_contribution, day_count_active, day_count_frozen_days, day_count_start_date';
+
 export async function fetchStudentAdminSettings(): Promise<StudentAdminSettings[]> {
   const { data, error } = await supabase
     .from('profiles')
-    .select(
-      'id, display_name, created_at, show_on_admin_dashboard, show_on_ogrenciler, count_in_earnings, day_count_active, day_count_frozen_days, day_count_start_date',
-    )
+    .select(STUDENT_SETTINGS_SELECT)
     .eq('role', 'student')
     .eq('is_active', true)
     .order('display_name');
@@ -223,22 +234,36 @@ export async function fetchStudentAdminSettings(): Promise<StudentAdminSettings[
   return (data ?? []).map((row) => mapStudentAdminSettings(row as Parameters<typeof mapStudentAdminSettings>[0]));
 }
 
-export async function fetchEarningsStudentCount(): Promise<number> {
-  const { count, error } = await supabase
+/** Sum of per-student earnings contributions (0 / 5000 / 6000). */
+export async function fetchMonthlyEarningsTotal(): Promise<number> {
+  const { data, error } = await supabase
     .from('profiles')
-    .select('id', { count: 'exact', head: true })
+    .select('earnings_contribution, count_in_earnings')
     .eq('role', 'student')
-    .eq('is_active', true)
-    .eq('count_in_earnings', true);
+    .eq('is_active', true);
 
   if (error) throw error;
-  return count ?? 0;
+
+  return (data ?? []).reduce((sum, row) => {
+    const contribution = (row as { earnings_contribution?: number | null; count_in_earnings?: boolean | null })
+      .earnings_contribution;
+    if (contribution === 0 || contribution === 5000 || contribution === 6000) {
+      return sum + contribution;
+    }
+    // Legacy fallback before 032 migration
+    const legacy = (row as { count_in_earnings?: boolean | null }).count_in_earnings;
+    return sum + (legacy === false ? 0 : 5000);
+  }, 0);
+}
+
+/** @deprecated Use fetchMonthlyEarningsTotal — kept name for older call sites. */
+export async function fetchEarningsStudentCount(): Promise<number> {
+  return fetchMonthlyEarningsTotal();
 }
 
 export type StudentSettingKey =
   | 'showOnAdminDashboard'
   | 'showOnOgrenciler'
-  | 'countInEarnings'
   | 'dayCountActive';
 
 function istanbulTodayDateKey(): string {
@@ -273,9 +298,7 @@ export async function updateStudentSetting(
 ): Promise<StudentAdminSettings> {
   const { data: current, error: readError } = await supabase
     .from('profiles')
-    .select(
-      'id, display_name, created_at, show_on_admin_dashboard, show_on_ogrenciler, count_in_earnings, day_count_active, day_count_frozen_days, day_count_start_date',
-    )
+    .select(STUDENT_SETTINGS_SELECT)
     .eq('id', studentId)
     .eq('role', 'student')
     .single();
@@ -291,7 +314,6 @@ export async function updateStudentSetting(
 
   if (key === 'showOnAdminDashboard') patch.show_on_admin_dashboard = value;
   if (key === 'showOnOgrenciler') patch.show_on_ogrenciler = value;
-  if (key === 'countInEarnings') patch.count_in_earnings = value;
 
   if (key === 'dayCountActive') {
     if (value) {
@@ -311,9 +333,26 @@ export async function updateStudentSetting(
     .update(patch)
     .eq('id', studentId)
     .eq('role', 'student')
-    .select(
-      'id, display_name, created_at, show_on_admin_dashboard, show_on_ogrenciler, count_in_earnings, day_count_active, day_count_frozen_days, day_count_start_date',
-    )
+    .select(STUDENT_SETTINGS_SELECT)
+    .single();
+  if (error) throw error;
+
+  return mapStudentAdminSettings(data as Parameters<typeof mapStudentAdminSettings>[0]);
+}
+
+export async function updateStudentEarningsContribution(
+  studentId: string,
+  contribution: 0 | 5000 | 6000,
+): Promise<StudentAdminSettings> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      earnings_contribution: contribution,
+      count_in_earnings: contribution > 0,
+    })
+    .eq('id', studentId)
+    .eq('role', 'student')
+    .select(STUDENT_SETTINGS_SELECT)
     .single();
   if (error) throw error;
 
