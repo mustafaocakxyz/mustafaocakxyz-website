@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
+  fetchPendingPasswordResetRequests,
   fetchStudentAdminSettings,
+  rejectPasswordResetRequest,
   updateStudentEarningsContribution,
   updateStudentSetting,
   type StudentSettingKey,
@@ -10,9 +12,11 @@ import {
 import { useAppAuth } from '../AppAuthContext';
 import type {
   EarningsContribution,
+  PasswordResetRequest,
   StudentAdminSettings,
 } from '../types';
 import { earningsContributionLabel, nextEarningsContribution } from '../types';
+import { adminResetStudentPassword } from '../../lib/adminResetPassword';
 import { preview as t } from '../preview/adminPreviewTheme';
 import {
   ContentCard,
@@ -189,6 +193,110 @@ const ToggleValue = styled.span<{ $on: boolean; $accent?: 'green' | 'orange' }>`
     !$on ? t.mutedSoft : $accent === 'orange' ? '#fdba74' : t.success};
 `;
 
+const ResetStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+`;
+
+const ResetRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: ${t.radiusSm};
+  border: 1px solid ${t.border};
+  background: ${t.panel2};
+`;
+
+const ResetMeta = styled.div`
+  flex: 1 1 180px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const ResetTitle = styled.div`
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: ${t.text};
+`;
+
+const ResetSub = styled.div`
+  font-size: 0.74rem;
+  color: ${t.muted};
+  line-height: 1.35;
+`;
+
+const ResetActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+`;
+
+const ResetInput = styled.input`
+  min-width: 140px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid ${t.borderStrong};
+  background: rgba(15, 23, 42, 0.55);
+  color: ${t.text};
+  font: inherit;
+  font-size: 0.82rem;
+
+  &:focus {
+    outline: none;
+    border-color: rgba(96, 165, 250, 0.5);
+  }
+`;
+
+const ResetSelect = styled.select`
+  min-width: 180px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid ${t.borderStrong};
+  background: rgba(15, 23, 42, 0.55);
+  color: ${t.text};
+  font: inherit;
+  font-size: 0.82rem;
+`;
+
+const ResetButton = styled.button<{ $variant?: 'danger' | 'primary' }>`
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid
+    ${({ $variant }) =>
+      $variant === 'danger' ? 'rgba(248, 113, 113, 0.45)' : 'rgba(96, 165, 250, 0.45)'};
+  background: ${({ $variant }) =>
+    $variant === 'danger' ? 'rgba(248, 113, 113, 0.14)' : 'rgba(59, 130, 246, 0.16)'};
+  color: ${t.text};
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+`;
+
+const HiddenLinkHint = styled.code`
+  font-size: 0.78rem;
+  color: ${t.muted};
+`;
+
+function formatRequestTime(iso: string): string {
+  return new Intl.DateTimeFormat('tr-TR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(iso));
+}
+
 const BOOL_SETTING_ROWS: { key: StudentSettingKey; label: string; title: string }[] = [
   { key: 'showOnAdminDashboard', label: 'Panel', title: 'Admin panelde göster' },
   { key: 'showOnOgrenciler', label: 'Öğrenciler', title: 'Öğrenciler sayfasında göster' },
@@ -210,9 +318,26 @@ function earningsAccent(value: EarningsContribution): 'green' | 'orange' | undef
 export function AdminSettingsPage() {
   const { user, isLoading, logout } = useAppAuth();
   const [students, setStudents] = useState<StudentAdminSettings[]>([]);
+  const [resetRequests, setResetRequests] = useState<PasswordResetRequest[]>([]);
+  const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({});
+  const [manualStudentId, setManualStudentId] = useState('');
+  const [manualPassword, setManualPassword] = useState('');
   const [pageLoading, setPageLoading] = useState(true);
+  const [resetLoading, setResetLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  const loadResetRequests = async () => {
+    setResetLoading(true);
+    try {
+      const rows = await fetchPendingPasswordResetRequests();
+      setResetRequests(rows);
+    } catch {
+      setError('Şifre sıfırlama talepleri yüklenemedi. 033 SQL çalıştırıldı mı?');
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
@@ -229,6 +354,7 @@ export function AdminSettingsPage() {
         if (mounted) setPageLoading(false);
       }
     })();
+    void loadResetRequests();
     return () => {
       mounted = false;
     };
@@ -263,6 +389,85 @@ export function AdminSettingsPage() {
       setStudents((rows) => rows.map((row) => (row.id === studentId ? updated : row)));
     } catch {
       setError('Kazanç ayarı kaydedilemedi. 032 SQL çalıştırıldı mı?');
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const studentNameById = (studentId: string | null, loginUsername: string) => {
+    if (!studentId) return loginUsername;
+    return students.find((row) => row.id === studentId)?.name ?? loginUsername;
+  };
+
+  const handleSavePassword = async (request: PasswordResetRequest) => {
+    if (!request.userId) {
+      setError('Bu talep geçersiz (öğrenci kimliği yok).');
+      return;
+    }
+    const newPassword = passwordDrafts[request.id]?.trim() ?? '';
+    if (newPassword.length < 6) {
+      setError('Yeni şifre en az 6 karakter olmalı.');
+      return;
+    }
+
+    const token = `reset:save:${request.id}`;
+    setBusyKey(token);
+    setError('');
+    try {
+      await adminResetStudentPassword({
+        studentId: request.userId,
+        newPassword,
+        requestId: request.id,
+      });
+      setPasswordDrafts((drafts) => {
+        const next = { ...drafts };
+        delete next[request.id];
+        return next;
+      });
+      await loadResetRequests();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Şifre kaydedilemedi.');
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string) => {
+    const token = `reset:reject:${requestId}`;
+    setBusyKey(token);
+    setError('');
+    try {
+      await rejectPasswordResetRequest(requestId);
+      await loadResetRequests();
+    } catch {
+      setError('Talep reddedilemedi.');
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleManualReset = async () => {
+    if (!manualStudentId) {
+      setError('Öğrenci seç.');
+      return;
+    }
+    const newPassword = manualPassword.trim();
+    if (newPassword.length < 6) {
+      setError('Yeni şifre en az 6 karakter olmalı.');
+      return;
+    }
+
+    setBusyKey('reset:manual');
+    setError('');
+    try {
+      await adminResetStudentPassword({
+        studentId: manualStudentId,
+        newPassword,
+      });
+      setManualPassword('');
+      await loadResetRequests();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Şifre kaydedilemedi.');
     } finally {
       setBusyKey(null);
     }
@@ -315,6 +520,105 @@ export function AdminSettingsPage() {
                 <ActionHint>Oturumu kapat</ActionHint>
               </SettingsButton>
             </SettingsStack>
+          </ContentCard>
+
+          <ContentCard>
+            <ContentTitle>Şifre sıfırlama</ContentTitle>
+            <ContentSub>
+              Öğrenci talepleri burada görünür. Yeni şifreyi kaydet, WhatsApp’tan ilet. Gizli
+              talep linki:{' '}
+              <HiddenLinkHint>/legal/x-akademi-sifre-sifirla</HiddenLinkHint>
+            </ContentSub>
+            {resetLoading ? <LoadingText>Talepler yükleniyor...</LoadingText> : null}
+            {!resetLoading && resetRequests.length === 0 ? (
+              <EmptyState>Bekleyen şifre sıfırlama talebi yok.</EmptyState>
+            ) : null}
+            {!resetLoading && resetRequests.length > 0 ? (
+              <ResetStack>
+                {resetRequests.map((request) => {
+                  const busySave = busyKey === `reset:save:${request.id}`;
+                  const busyReject = busyKey === `reset:reject:${request.id}`;
+                  return (
+                    <ResetRow key={request.id}>
+                      <ResetMeta>
+                        <ResetTitle>
+                          {studentNameById(request.userId, request.loginUsername)}
+                        </ResetTitle>
+                        <ResetSub>
+                          @{request.loginUsername} · {formatRequestTime(request.requestedAt)}
+                          {request.note ? ` · ${request.note}` : ''}
+                        </ResetSub>
+                      </ResetMeta>
+                      <ResetActions>
+                        <ResetInput
+                          type="text"
+                          autoComplete="new-password"
+                          placeholder="Yeni şifre"
+                          value={passwordDrafts[request.id] ?? ''}
+                          disabled={busySave || busyReject}
+                          onChange={(event) =>
+                            setPasswordDrafts((drafts) => ({
+                              ...drafts,
+                              [request.id]: event.target.value,
+                            }))
+                          }
+                        />
+                        <ResetButton
+                          type="button"
+                          $variant="primary"
+                          disabled={busySave || busyReject}
+                          onClick={() => void handleSavePassword(request)}
+                        >
+                          {busySave ? 'Kaydediliyor…' : 'Kaydet'}
+                        </ResetButton>
+                        <ResetButton
+                          type="button"
+                          $variant="danger"
+                          disabled={busySave || busyReject}
+                          onClick={() => void handleRejectRequest(request.id)}
+                        >
+                          {busyReject ? '…' : 'Reddet'}
+                        </ResetButton>
+                      </ResetActions>
+                    </ResetRow>
+                  );
+                })}
+              </ResetStack>
+            ) : null}
+
+            <ContentSub style={{ marginTop: 16 }}>
+              Talep olmadan da öğrenci seçip şifre sıfırlayabilirsin.
+            </ContentSub>
+            <ResetActions style={{ marginTop: 8 }}>
+              <ResetSelect
+                value={manualStudentId}
+                onChange={(event) => setManualStudentId(event.target.value)}
+                disabled={busyKey === 'reset:manual'}
+              >
+                <option value="">Öğrenci seç…</option>
+                {students.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {student.name}
+                  </option>
+                ))}
+              </ResetSelect>
+              <ResetInput
+                type="text"
+                autoComplete="new-password"
+                placeholder="Yeni şifre"
+                value={manualPassword}
+                disabled={busyKey === 'reset:manual'}
+                onChange={(event) => setManualPassword(event.target.value)}
+              />
+              <ResetButton
+                type="button"
+                $variant="primary"
+                disabled={busyKey === 'reset:manual'}
+                onClick={() => void handleManualReset()}
+              >
+                {busyKey === 'reset:manual' ? 'Kaydediliyor…' : 'Manuel sıfırla'}
+              </ResetButton>
+            </ResetActions>
           </ContentCard>
 
           <ContentCard>

@@ -70,6 +70,16 @@ export type StudentAdminSettings = {
   createdAt: string;
 } & StudentVisibilitySettings;
 
+export type PasswordResetRequest = {
+  id: string;
+  userId: string | null;
+  loginUsername: string;
+  note: string;
+  status: 'pending' | 'completed' | 'rejected';
+  requestedAt: string;
+  studentName?: string;
+};
+
 export type StudentMeeting = {
   id: string;
   studentId: string;

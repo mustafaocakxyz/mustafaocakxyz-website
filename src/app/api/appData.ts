@@ -33,6 +33,7 @@ import {
   type DenemeEntryInput,
   type DenemeLeafScore,
   type StudentAdminSettings,
+  type PasswordResetRequest,
   type StudentCurriculumState,
   type StudentMeeting,
   type StudentSummary,
@@ -357,6 +358,32 @@ export async function updateStudentEarningsContribution(
   if (error) throw error;
 
   return mapStudentAdminSettings(data as Parameters<typeof mapStudentAdminSettings>[0]);
+}
+
+export async function fetchPendingPasswordResetRequests(): Promise<PasswordResetRequest[]> {
+  const { data, error } = await supabase
+    .from('password_reset_requests')
+    .select('id, user_id, login_username, note, status, requested_at')
+    .eq('status', 'pending')
+    .order('requested_at', { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    userId: (row.user_id as string | null) ?? null,
+    loginUsername: row.login_username as string,
+    note: (row.note as string) ?? '',
+    status: row.status as PasswordResetRequest['status'],
+    requestedAt: row.requested_at as string,
+  }));
+}
+
+export async function rejectPasswordResetRequest(requestId: string): Promise<void> {
+  const { error } = await supabase.rpc('reject_password_reset_request', {
+    p_request_id: requestId,
+  });
+  if (error) throw error;
 }
 
 export async function fetchTasksForRange(
