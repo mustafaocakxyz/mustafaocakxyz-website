@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
@@ -7,6 +7,7 @@ import {
   ensureChatThread,
   fetchAdminChatInbox,
   fetchChatMessages,
+  fetchOrgTasksForDates,
   markChatThreadRead,
   prefetchChatAttachmentUrls,
   sendChatAttachmentMessage,
@@ -26,7 +27,9 @@ import {
   PreviewFrame,
   PreviewShell,
   PreviewTopBar,
+  SearchInput,
   SidebarTitle,
+  StatusChip,
   TopBarActions,
   TopBarButton,
   TopBarEnd,
@@ -34,6 +37,8 @@ import {
 } from '../preview/AdminPreviewUi';
 import type { AdminChatInboxItem, ChatMessage, ChatMessageType } from '../types';
 import { getCachedChatSignedUrlSync } from '../utils/chatSignedUrlCache';
+import { toDateKey } from '../utils/dates';
+import { computeCompletionPercent } from '../utils/taskLabel';
 
 const CHAT_STAGE_HEIGHT = 'calc(100dvh - 200px)';
 
@@ -122,9 +127,16 @@ const InboxMain = styled.div`
 
 const InboxTop = styled.div`
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
+`;
+
+const InboxNameRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 `;
 
 const InboxName = styled.span<{ $unread: boolean }>`
@@ -136,6 +148,12 @@ const InboxName = styled.span<{ $unread: boolean }>`
   font-size: 0.92rem;
   line-height: 1.3;
   color: ${t.text};
+`;
+
+const CompactStatusChip = styled(StatusChip)`
+  flex-shrink: 0;
+  padding: 2px 7px;
+  font-size: 0.68rem;
 `;
 
 const InboxTime = styled.span<{ $unread: boolean }>`
@@ -200,6 +218,13 @@ const ChatPanelHead = styled.div`
   gap: 6px;
 `;
 
+const ChatPanelTitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+`;
+
 const MessageList = styled.div`
   flex: 1;
   min-height: 0;
@@ -216,6 +241,41 @@ const MessageList = styled.div`
     height: 0;
     display: none;
   }
+`;
+
+const DayDivider = styled.div`
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: 12px;
+  margin: 6px 0 2px;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(148, 163, 184, 0.22);
+  }
+`;
+
+const DayDividerLabel = styled.span`
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid ${t.border};
+  background: rgba(15, 23, 42, 0.55);
+  color: ${t.mutedSoft};
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+`;
+
+const EmptyListHint = styled.p`
+  margin: 8px 4px;
+  font-size: 0.82rem;
+  color: ${t.muted};
 `;
 
 const ComposerWrap = styled.div`
@@ -428,6 +488,39 @@ function formatClock(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(iso));
+}
+
+function messageDateKey(iso: string): string {
+  return toDateKey(new Date(iso));
+}
+
+function formatChatDayLabel(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startMsg = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayDiff = Math.round((startToday.getTime() - startMsg.getTime()) / 86400000);
+  if (dayDiff === 0) return 'Bugün';
+  if (dayDiff === 1) return 'Dün';
+  return new Intl.DateTimeFormat('tr-TR', {
+    day: 'numeric',
+    month: 'long',
+    year: startMsg.getFullYear() === startToday.getFullYear() ? undefined : 'numeric',
+  }).format(date);
+}
+
+type CompletionTone = 'ok' | 'warn' | 'bad' | 'muted';
+
+function completionTone(percent: number | null): CompletionTone {
+  if (percent === null) return 'muted';
+  if (percent >= 100) return 'ok';
+  if (percent >= 50) return 'warn';
+  return 'bad';
+}
+
+function formatCompletionLabel(percent: number | null | undefined): string {
+  if (percent === null || percent === undefined) return '—';
+  return `${percent}%`;
 }
 
 function formatInboxTime(iso: string | null): string {
@@ -643,6 +736,10 @@ function MessageAttachment({ message }: { message: ChatMessage }) {
 export function AdminChatPage() {
   const { user, isLoading } = useAppAuth();
   const [inbox, setInbox] = useState<AdminChatInboxItem[]>([]);
+  const [studentQuery, setStudentQuery] = useState('');
+  const [todayPercentByStudent, setTodayPercentByStudent] = useState<Record<string, number | null>>(
+    {},
+  );
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -659,6 +756,14 @@ export function AdminChatPage() {
   const mediaChunksRef = useRef<BlobPart[]>([]);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const selectedStudentIdRef = useRef<string | null>(null);
+
+  const todayKey = useMemo(() => toDateKey(new Date()), []);
+
+  const filteredInbox = useMemo(() => {
+    const q = studentQuery.trim().toLocaleLowerCase('tr');
+    if (!q) return inbox;
+    return inbox.filter((item) => item.studentName.toLocaleLowerCase('tr').includes(q));
+  }, [inbox, studentQuery]);
 
   useEffect(() => {
     selectedStudentIdRef.current = selectedStudentId;
@@ -716,22 +821,31 @@ export function AdminChatPage() {
     if (!user || user.role !== 'admin') return;
     let mounted = true;
     setPageLoading(true);
-    void fetchAdminChatInbox()
-      .then((rows) => {
+    void (async () => {
+      try {
+        const [rows, orgTasks] = await Promise.all([
+          fetchAdminChatInbox(),
+          fetchOrgTasksForDates([todayKey]),
+        ]);
         if (!mounted) return;
         setInbox(rows);
-        // Do not auto-open a conversation — that would mark it read and hide unread badges.
-      })
-      .catch(() => {
+        const percents: Record<string, number | null> = {};
+        for (const item of rows) {
+          const todayTasks = orgTasks[item.studentId]?.[todayKey] ?? [];
+          percents[item.studentId] =
+            todayTasks.length === 0 ? null : (computeCompletionPercent(todayTasks) ?? 0);
+        }
+        setTodayPercentByStudent(percents);
+      } catch {
         if (mounted) setError('Öğrenciler yüklenemedi.');
-      })
-      .finally(() => {
+      } finally {
         if (mounted) setPageLoading(false);
-      });
+      }
+    })();
     return () => {
       mounted = false;
     };
-  }, [user]);
+  }, [user, todayKey]);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
@@ -822,6 +936,9 @@ export function AdminChatPage() {
   if (user.role !== 'admin') return <Navigate to="/app/student" replace />;
 
   const selectedStudent = inbox.find((s) => s.studentId === selectedStudentId) ?? null;
+  const selectedTodayPercent = selectedStudentId
+    ? (todayPercentByStudent[selectedStudentId] ?? null)
+    : null;
 
   const appendMessage = (message: ChatMessage) => {
     setMessages((current) => {
@@ -975,9 +1092,16 @@ export function AdminChatPage() {
           <ChatLayout>
             <ChatSidebar>
               <SidebarTitle>Öğrenciler</SidebarTitle>
+              <SearchInput
+                value={studentQuery}
+                onChange={(event) => setStudentQuery(event.target.value)}
+                placeholder="Öğrenci ara…"
+                aria-label="Öğrenci ara"
+              />
               <StudentList>
-                {inbox.map((item) => {
+                {filteredInbox.map((item) => {
                   const unread = item.unreadCount > 0;
+                  const todayPercent = todayPercentByStudent[item.studentId] ?? null;
                   return (
                     <InboxRow
                       key={item.studentId}
@@ -987,7 +1111,12 @@ export function AdminChatPage() {
                     >
                       <InboxMain>
                         <InboxTop>
-                          <InboxName $unread={unread}>{item.studentName}</InboxName>
+                          <InboxNameRow>
+                            <InboxName $unread={unread}>{item.studentName}</InboxName>
+                            <CompactStatusChip $tone={completionTone(todayPercent)}>
+                              {formatCompletionLabel(todayPercent)}
+                            </CompactStatusChip>
+                          </InboxNameRow>
                           <InboxTime $unread={unread}>{formatInboxTime(item.lastMessageAt)}</InboxTime>
                         </InboxTop>
                         <InboxBottom>
@@ -1004,26 +1133,50 @@ export function AdminChatPage() {
                     </InboxRow>
                   );
                 })}
+                {!pageLoading && filteredInbox.length === 0 ? (
+                  <EmptyListHint>
+                    {studentQuery.trim() ? 'Eşleşen öğrenci yok.' : 'Öğrenci yok.'}
+                  </EmptyListHint>
+                ) : null}
               </StudentList>
             </ChatSidebar>
 
             <ChatPanel>
               <ChatPanelHead>
-                <ContentTitle>{selectedStudent?.studentName ?? 'Öğrenci seç'}</ContentTitle>
+                <ChatPanelTitleRow>
+                  <ContentTitle style={{ margin: 0 }}>
+                    {selectedStudent?.studentName ?? 'Öğrenci seç'}
+                  </ContentTitle>
+                  {selectedStudent ? (
+                    <StatusChip $tone={completionTone(selectedTodayPercent)}>
+                      Bugün {formatCompletionLabel(selectedTodayPercent)}
+                    </StatusChip>
+                  ) : null}
+                </ChatPanelTitleRow>
                 {chatLoading ? <LoadingText>Sohbet yükleniyor...</LoadingText> : null}
               </ChatPanelHead>
               <MessageList ref={listRef}>
                 {!chatLoading && messages.length === 0 ? (
                   <EmptyChat>Henüz mesaj yok. İlk mesajı sen yazabilirsin.</EmptyChat>
                 ) : null}
-                {messages.map((message) => {
+                {messages.map((message, index) => {
                   const mine = message.senderId === user.id;
+                  const prev = messages[index - 1];
+                  const showDayDivider =
+                    !prev || messageDateKey(prev.createdAt) !== messageDateKey(message.createdAt);
                   return (
-                    <Bubble key={message.id} $mine={mine}>
-                      <MessageAttachment message={message} />
-                      {message.body ? message.body : null}
-                      <Meta>{formatClock(message.createdAt)}</Meta>
-                    </Bubble>
+                    <Fragment key={message.id}>
+                      {showDayDivider ? (
+                        <DayDivider>
+                          <DayDividerLabel>{formatChatDayLabel(message.createdAt)}</DayDividerLabel>
+                        </DayDivider>
+                      ) : null}
+                      <Bubble $mine={mine}>
+                        <MessageAttachment message={message} />
+                        {message.body ? message.body : null}
+                        <Meta>{formatClock(message.createdAt)}</Meta>
+                      </Bubble>
+                    </Fragment>
                   );
                 })}
               </MessageList>
