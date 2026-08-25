@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { ArrowDownWideNarrow } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
@@ -75,6 +76,39 @@ const ChatSidebar = styled.aside`
 
   @media (max-width: 800px) {
     height: min(280px, 40vh);
+  }
+`;
+
+const SearchRow = styled.div`
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+`;
+
+const SearchField = styled(SearchInput)`
+  flex: 1;
+  min-width: 0;
+`;
+
+const SortToggleButton = styled.button<{ $active: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  padding: 0;
+  border-radius: ${t.radiusSm};
+  border: 1px solid
+    ${({ $active }) => ($active ? 'rgba(96, 165, 250, 0.55)' : t.border)};
+  background: ${({ $active }) => ($active ? 'rgba(59, 130, 246, 0.14)' : t.panel2)};
+  color: ${({ $active }) => ($active ? 'rgba(191, 219, 254, 0.98)' : t.muted)};
+  cursor: pointer;
+  box-shadow: ${({ $active }) =>
+    $active ? '0 0 0 1px rgba(96, 165, 250, 0.2), 0 0 12px rgba(59, 130, 246, 0.18)' : 'none'};
+
+  &:hover {
+    border-color: rgba(96, 165, 250, 0.45);
+    color: ${t.text};
   }
 `;
 
@@ -576,6 +610,24 @@ function sortInbox(items: AdminChatInboxItem[]): AdminChatInboxItem[] {
   });
 }
 
+function completionSortKey(percent: number | null): number {
+  if (percent === null) return -1;
+  return percent;
+}
+
+function sortInboxByCompletion(
+  items: AdminChatInboxItem[],
+  todayPercentByStudent: Record<string, number | null>,
+): AdminChatInboxItem[] {
+  return [...items].sort((a, b) => {
+    const keyDiff =
+      completionSortKey(todayPercentByStudent[a.studentId] ?? null) -
+      completionSortKey(todayPercentByStudent[b.studentId] ?? null);
+    if (keyDiff !== 0) return keyDiff;
+    return a.studentName.localeCompare(b.studentName, 'tr');
+  });
+}
+
 function inboxPreviewFromMessage(
   message: ChatMessage,
   currentUserId: string,
@@ -737,6 +789,7 @@ export function AdminChatPage() {
   const { user, isLoading } = useAppAuth();
   const [inbox, setInbox] = useState<AdminChatInboxItem[]>([]);
   const [studentQuery, setStudentQuery] = useState('');
+  const [sortByCompletion, setSortByCompletion] = useState(false);
   const [todayPercentByStudent, setTodayPercentByStudent] = useState<Record<string, number | null>>(
     {},
   );
@@ -761,9 +814,14 @@ export function AdminChatPage() {
 
   const filteredInbox = useMemo(() => {
     const q = studentQuery.trim().toLocaleLowerCase('tr');
-    if (!q) return inbox;
-    return inbox.filter((item) => item.studentName.toLocaleLowerCase('tr').includes(q));
-  }, [inbox, studentQuery]);
+    const items = q
+      ? inbox.filter((item) => item.studentName.toLocaleLowerCase('tr').includes(q))
+      : inbox;
+    if (sortByCompletion) {
+      return sortInboxByCompletion(items, todayPercentByStudent);
+    }
+    return items;
+  }, [inbox, studentQuery, sortByCompletion, todayPercentByStudent]);
 
   useEffect(() => {
     selectedStudentIdRef.current = selectedStudentId;
@@ -1092,12 +1150,32 @@ export function AdminChatPage() {
           <ChatLayout>
             <ChatSidebar>
               <SidebarTitle>Öğrenciler</SidebarTitle>
-              <SearchInput
-                value={studentQuery}
-                onChange={(event) => setStudentQuery(event.target.value)}
-                placeholder="Öğrenci ara…"
-                aria-label="Öğrenci ara"
-              />
+              <SearchRow>
+                <SearchField
+                  value={studentQuery}
+                  onChange={(event) => setStudentQuery(event.target.value)}
+                  placeholder="Öğrenci ara…"
+                  aria-label="Öğrenci ara"
+                />
+                <SortToggleButton
+                  type="button"
+                  $active={sortByCompletion}
+                  title={
+                    sortByCompletion
+                      ? 'Son mesaja göre sırala'
+                      : 'Bugünkü tamamlamaya göre sırala (en düşük üstte)'
+                  }
+                  aria-label={
+                    sortByCompletion
+                      ? 'Son mesaja göre sırala'
+                      : 'Bugünkü tamamlamaya göre sırala'
+                  }
+                  aria-pressed={sortByCompletion}
+                  onClick={() => setSortByCompletion((current) => !current)}
+                >
+                  <ArrowDownWideNarrow size={16} strokeWidth={2.4} />
+                </SortToggleButton>
+              </SearchRow>
               <StudentList>
                 {filteredInbox.map((item) => {
                   const unread = item.unreadCount > 0;
