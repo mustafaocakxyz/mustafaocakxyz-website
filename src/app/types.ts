@@ -58,6 +58,7 @@ export function asEarningsContribution(raw: unknown): EarningsContribution {
 export type StudentVisibilitySettings = {
   showOnAdminDashboard: boolean;
   showOnOgrenciler: boolean;
+  showInAdminChat: boolean;
   earningsContribution: EarningsContribution;
   dayCountActive: boolean;
   dayCountFrozenDays: number | null;

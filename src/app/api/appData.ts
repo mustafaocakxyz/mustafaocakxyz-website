@@ -167,6 +167,24 @@ export async function fetchStudents(): Promise<StudentSummary[]> {
   }));
 }
 
+/** Active students visible in admin chat (ignores dashboard visibility). */
+export async function fetchChatVisibleStudents(): Promise<StudentSummary[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name')
+    .eq('role', 'student')
+    .eq('is_active', true)
+    .eq('show_in_admin_chat', true)
+    .order('display_name');
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.display_name,
+  }));
+}
+
 /** All active students for chat / internal tools (ignores dashboard visibility). */
 export async function fetchAllActiveStudents(): Promise<StudentSummary[]> {
   const { data, error } = await supabase
@@ -190,6 +208,7 @@ function mapStudentAdminSettings(row: {
   created_at: string;
   show_on_admin_dashboard?: boolean | null;
   show_on_ogrenciler?: boolean | null;
+  show_in_admin_chat?: boolean | null;
   count_in_earnings?: boolean | null;
   earnings_contribution?: number | null;
   day_count_active?: boolean | null;
@@ -211,6 +230,7 @@ function mapStudentAdminSettings(row: {
     createdAt: row.created_at,
     showOnAdminDashboard: row.show_on_admin_dashboard !== false,
     showOnOgrenciler: row.show_on_ogrenciler !== false,
+    showInAdminChat: row.show_in_admin_chat !== false,
     earningsContribution,
     dayCountActive: row.day_count_active !== false,
     dayCountFrozenDays:
@@ -220,7 +240,7 @@ function mapStudentAdminSettings(row: {
 }
 
 const STUDENT_SETTINGS_SELECT =
-  'id, display_name, created_at, show_on_admin_dashboard, show_on_ogrenciler, count_in_earnings, earnings_contribution, day_count_active, day_count_frozen_days, day_count_start_date';
+  'id, display_name, created_at, show_on_admin_dashboard, show_on_ogrenciler, show_in_admin_chat, count_in_earnings, earnings_contribution, day_count_active, day_count_frozen_days, day_count_start_date';
 
 export async function fetchStudentAdminSettings(): Promise<StudentAdminSettings[]> {
   const { data, error } = await supabase
@@ -265,6 +285,7 @@ export async function fetchEarningsStudentCount(): Promise<number> {
 export type StudentSettingKey =
   | 'showOnAdminDashboard'
   | 'showOnOgrenciler'
+  | 'showInAdminChat'
   | 'dayCountActive';
 
 function istanbulTodayDateKey(): string {
@@ -315,6 +336,7 @@ export async function updateStudentSetting(
 
   if (key === 'showOnAdminDashboard') patch.show_on_admin_dashboard = value;
   if (key === 'showOnOgrenciler') patch.show_on_ogrenciler = value;
+  if (key === 'showInAdminChat') patch.show_in_admin_chat = value;
 
   if (key === 'dayCountActive') {
     if (value) {
@@ -1227,7 +1249,7 @@ function sortAdminChatInbox(items: AdminChatInboxItem[]): AdminChatInboxItem[] {
 /** Active students + thread preview/unread for admin chat sidebar. */
 export async function fetchAdminChatInbox(): Promise<AdminChatInboxItem[]> {
   const [students, threadsRes] = await Promise.all([
-    fetchAllActiveStudents(),
+    fetchChatVisibleStudents(),
     supabase
       .from('chat_threads')
       .select(CHAT_THREAD_SELECT),
@@ -1256,11 +1278,17 @@ export async function fetchAdminChatInbox(): Promise<AdminChatInboxItem[]> {
   );
 }
 
-/** Count of students/threads with at least one unread admin message (navbar badge). */
+/** Count of visible chat students/threads with at least one unread admin message (navbar badge). */
 export async function fetchAdminChatUnreadTotal(): Promise<number> {
-  const { data, error } = await supabase.from('chat_threads').select('admin_unread_count');
-  if (error) throw error;
-  return (data ?? []).reduce((count, row) => {
+  const [students, threadsRes] = await Promise.all([
+    fetchChatVisibleStudents(),
+    supabase.from('chat_threads').select('student_id, admin_unread_count'),
+  ]);
+  if (threadsRes.error) throw threadsRes.error;
+
+  const visibleIds = new Set(students.map((student) => student.id));
+  return (threadsRes.data ?? []).reduce((count, row) => {
+    if (!visibleIds.has(row.student_id as string)) return count;
     const n = typeof row.admin_unread_count === 'number' ? row.admin_unread_count : 0;
     return n > 0 ? count + 1 : count;
   }, 0);

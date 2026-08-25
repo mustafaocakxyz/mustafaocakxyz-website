@@ -19,6 +19,7 @@ export type DbProfile = {
   is_active: boolean;
   show_on_admin_dashboard?: boolean;
   show_on_ogrenciler?: boolean;
+  show_in_admin_chat?: boolean;
   count_in_earnings?: boolean;
   earnings_contribution?: number;
   day_count_active?: boolean;

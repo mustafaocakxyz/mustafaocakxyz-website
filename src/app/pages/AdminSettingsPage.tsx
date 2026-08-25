@@ -300,12 +300,14 @@ function formatRequestTime(iso: string): string {
 const BOOL_SETTING_ROWS: { key: StudentSettingKey; label: string; title: string }[] = [
   { key: 'showOnAdminDashboard', label: 'Panel', title: 'Admin panelde göster' },
   { key: 'showOnOgrenciler', label: 'Öğrenciler', title: 'Öğrenciler sayfasında göster' },
+  { key: 'showInAdminChat', label: 'Sohbet', title: 'Admin sohbet listesinde göster' },
   { key: 'dayCountActive', label: 'Gün', title: 'Gün sayacı aktif' },
 ];
 
 function boolSettingValue(student: StudentAdminSettings, key: StudentSettingKey): boolean {
   if (key === 'showOnAdminDashboard') return student.showOnAdminDashboard;
   if (key === 'showOnOgrenciler') return student.showOnOgrenciler;
+  if (key === 'showInAdminChat') return student.showInAdminChat;
   return student.dayCountActive;
 }
 
@@ -349,7 +351,7 @@ export function AdminSettingsPage() {
         const rows = await fetchStudentAdminSettings();
         if (mounted) setStudents(rows);
       } catch {
-        if (mounted) setError('Öğrenci ayarları yüklenemedi. 026/032 SQL çalıştırıldı mı?');
+        if (mounted) setError('Öğrenci ayarları yüklenemedi. 026/032/035 SQL çalıştırıldı mı?');
       } finally {
         if (mounted) setPageLoading(false);
       }
@@ -624,7 +626,8 @@ export function AdminSettingsPage() {
           <ContentCard>
             <ContentTitle>Öğrenci ayarları</ContentTitle>
             <ContentSub>
-              Panel / öğrenciler / gün: aç-kapa. Kazanç: Kapalı → 5000 → 6000 (tıkla).
+              Panel / öğrenciler / sohbet / gün: aç-kapa. Kazanç: Kapalı → 5000 → 6000 (tıkla).
+              Sohbet kapalıysa öğrenci listeden gizlenir; mesajlar silinmez.
             </ContentSub>
             {error ? <ErrorText>{error}</ErrorText> : null}
             {pageLoading ? <LoadingText>Yükleniyor...</LoadingText> : null}
