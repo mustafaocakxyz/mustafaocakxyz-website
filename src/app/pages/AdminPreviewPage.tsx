@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Library, Settings, Table2, Video } from 'lucide-react';
+import { BarChart2, Download, Library, Settings, Table2, Video } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import {
@@ -1281,6 +1281,14 @@ export function AdminPreviewPage() {
             aria-label="Görev analizi"
           >
             <Table2 size={16} strokeWidth={2.4} />
+          </TopBarIconButton>
+          <TopBarIconButton
+            as={Link}
+            to="/app/admin/yca"
+            title="Dün tamamlama"
+            aria-label="Dün tamamlama"
+          >
+            <BarChart2 size={16} strokeWidth={2.4} />
           </TopBarIconButton>
           <TopBarIconButton
             as={Link}

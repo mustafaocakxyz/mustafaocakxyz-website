@@ -6,6 +6,7 @@ import { AdminPreviewPage } from './pages/AdminPreviewPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminShowcasePage } from './pages/AdminShowcasePage';
 import { AdminTeaPage } from './pages/AdminTeaPage';
+import { AdminYcaPage } from './pages/AdminYcaPage';
 import { AppLoginPage } from './pages/AppLoginPage';
 import { StudentChatPage } from './pages/StudentChatPage';
 import { StudentDashboardPage } from './pages/StudentDashboardPage';
@@ -25,6 +26,7 @@ export function AppRoutes() {
         <Route path="admin/preview" element={<Navigate to="/app/admin" replace />} />
         <Route path="admin/settings" element={<AdminSettingsPage />} />
         <Route path="admin/tea" element={<AdminTeaPage />} />
+        <Route path="admin/yca" element={<AdminYcaPage />} />
         <Route path="admin/library" element={<AdminLibraryPage />} />
         <Route path="admin/showcase" element={<AdminShowcasePage />} />
         <Route path="admin/chat" element={<AdminChatPage />} />
