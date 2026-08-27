@@ -153,9 +153,9 @@ const CapacityPill = styled.span`
   gap: 10px;
   padding: 9px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(251, 146, 60, 0.5);
-  background: rgba(234, 88, 12, 0.18);
-  color: rgba(254, 215, 170, 0.98);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(239, 68, 68, 0.16);
+  color: rgba(254, 202, 202, 0.98);
   font-size: 0.92rem;
   font-weight: 800;
   font-family: inherit;
@@ -182,8 +182,8 @@ const CapacityDotCore = styled.span`
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #f97316;
-  box-shadow: 0 0 10px rgba(249, 115, 22, 0.75);
+  background: #ef4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.75);
   z-index: 1;
 `;
 
@@ -191,7 +191,7 @@ const CapacityDotPulse = styled.span`
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(251, 146, 60, 0.5);
+  background: rgba(248, 113, 113, 0.5);
   animation: capacityPillBreath 1.8s ease-in-out infinite;
 
   @keyframes capacityPillBreath {
