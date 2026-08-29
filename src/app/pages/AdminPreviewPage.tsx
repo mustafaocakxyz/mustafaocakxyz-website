@@ -23,6 +23,7 @@ import {
   fetchOrgTasksForRange,
   fetchStudentCurriculumState,
   fetchStudentIdsWithMeetingsInRange,
+  fetchStudentAdminSettings,
   fetchStudents,
   fetchSubmissionsForRange,
   fetchTasksForRange,
@@ -88,6 +89,7 @@ import {
   IdentityLeft,
   IdentityNav,
   IdentityNavButton,
+  IdentitySub,
   IdentityTitle,
   IdentityTop,
   LiveDotCore,
@@ -119,6 +121,7 @@ import {
   TopBarEnd,
   TopBarTitle,
 } from '../preview/AdminPreviewUi';
+import { resolvePublicDaysInProgram } from '../../lib/fetchPublicStudentShowcase';
 import { preview as t } from '../preview/adminPreviewTheme';
 
 /** Default week still yesterday→+5; slider starts padded so admin can scroll out. */
@@ -326,6 +329,13 @@ const IdentityNameRow = styled.div`
   flex-wrap: wrap;
 `;
 
+const IdentityText = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+`;
+
 const StudentExportButton = styled.button`
   flex-shrink: 0;
   padding: 4px 10px;
@@ -395,6 +405,7 @@ export function AdminPreviewPage() {
     () => new Set(),
   );
   const [studentStatuses, setStudentStatuses] = useState<Record<string, StudentStatus>>({});
+  const [studentDaysInProgram, setStudentDaysInProgram] = useState<Record<string, number>>({});
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [bootProgress, setBootProgress] = useState(0);
   const [isPageLoading, setIsPageLoading] = useState(false);
@@ -507,16 +518,33 @@ export function AdminPreviewPage() {
 
     const bootstrap = async () => {
       try {
-        const [rows, catalog, earningsTotal] = await Promise.all([
+        const [rows, catalog, earningsTotal, settingsRows] = await Promise.all([
           fetchStudents(),
           fetchCurriculumCatalog(),
           fetchMonthlyEarningsTotal(),
+          fetchStudentAdminSettings(),
         ]);
         if (!isMounted) return;
         bump(18);
         setStudents(rows);
         setCurriculumCatalog(catalog);
         setMonthlyEarnings(earningsTotal);
+        setStudentDaysInProgram(
+          Object.fromEntries(
+            settingsRows.map((student) => [
+              student.id,
+              resolvePublicDaysInProgram({
+                id: student.id,
+                displayName: student.name,
+                createdAt: student.createdAt,
+                showcaseHighlights: [],
+                dayCountActive: student.dayCountActive,
+                dayCountFrozenDays: student.dayCountFrozenDays,
+                dayCountStartDate: student.dayCountStartDate,
+              }),
+            ]),
+          ),
+        );
 
         const studentIds = rows.map((row) => row.id);
         const advancePerQuery = 16;
@@ -1390,17 +1418,24 @@ export function AdminPreviewPage() {
                       >
                         {initials(selectedStudent.name)}
                       </Avatar>
-                      <IdentityNameRow>
-                        <IdentityTitle>{selectedStudent.name}</IdentityTitle>
-                        <StudentExportButton
-                          type="button"
-                          disabled={isExporting}
-                          onClick={() => void handleExportStudent()}
-                          title="Öğrenci verilerini JSON olarak dışa aktar"
-                        >
-                          JSON
-                        </StudentExportButton>
-                      </IdentityNameRow>
+                      <IdentityText>
+                        <IdentityNameRow>
+                          <IdentityTitle>{selectedStudent.name}</IdentityTitle>
+                          <StudentExportButton
+                            type="button"
+                            disabled={isExporting}
+                            onClick={() => void handleExportStudent()}
+                            title="Öğrenci verilerini JSON olarak dışa aktar"
+                          >
+                            JSON
+                          </StudentExportButton>
+                        </IdentityNameRow>
+                        {studentDaysInProgram[selectedStudent.id] ? (
+                          <IdentitySub>
+                            {studentDaysInProgram[selectedStudent.id]} gündür çalışıyor
+                          </IdentitySub>
+                        ) : null}
+                      </IdentityText>
                     </IdentityLeft>
                     {showReturnToTasks ? (
                       <AccentButton type="button" onClick={() => setSection('tasks')}>
