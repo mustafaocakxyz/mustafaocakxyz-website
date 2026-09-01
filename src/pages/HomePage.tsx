@@ -28,8 +28,8 @@ export function HomePage() {
 
   const capacityPill =
     studentCount === null
-      ? 'KONTENJAN DOLU … / …'
-      : `KONTENJAN DOLU ${studentCount} / ${studentCount}`;
+      ? 'KONTENJAN DOLUYOR … / 40'
+      : `KONTENJAN DOLUYOR ${studentCount} / 40`;
 
   return (
     <HomeLayout>
