@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
@@ -38,10 +38,13 @@ import {
   PreviewDaySlider,
 } from '../preview/AdminPreviewUi';
 import type { DailySubmission, StudentMeeting, StudentTask } from '../types';
-import { buildWeekDays, formatDayHeading, toDateKey } from '../utils/dates';
+import { buildDaysFromOffsets, buildWeekDays, formatDayHeading, toDateKey } from '../utils/dates';
 import { computeCompletionPercent } from '../utils/taskLabel';
 
-const TODAY_INDEX = 1;
+/** Default week still yesterday→+5; slider starts padded so students can scroll out. */
+const STUDENT_DAY_PAD = 14;
+const STUDENT_DAY_CHUNK = 14;
+const STUDENT_TODAY_INDEX = STUDENT_DAY_PAD + 1;
 
 type ProgressTone = 'ok' | 'warn' | 'bad' | 'muted';
 
@@ -169,7 +172,14 @@ export function StudentDashboardPage() {
   const weekDays = useMemo(() => buildWeekDays(), []);
   const weekFrom = toDateKey(weekDays[0]);
   const weekTo = toDateKey(weekDays[weekDays.length - 1]);
-  const [selectedIndex, setSelectedIndex] = useState(TODAY_INDEX);
+  const [dayOffsetStart, setDayOffsetStart] = useState(-1 - STUDENT_DAY_PAD);
+  const [dayOffsetEnd, setDayOffsetEnd] = useState(5 + STUDENT_DAY_PAD);
+  const days = useMemo(
+    () => buildDaysFromOffsets(dayOffsetStart, dayOffsetEnd),
+    [dayOffsetStart, dayOffsetEnd],
+  );
+  const todayDayIndex = -dayOffsetStart;
+  const [selectedIndex, setSelectedIndex] = useState(STUDENT_TODAY_INDEX);
   const [tasksByDate, setTasksByDate] = useState<Record<string, StudentTask[]>>({});
   const [submissionsByDate, setSubmissionsByDate] = useState<Record<string, DailySubmission>>({});
   const [adminNotesByDate, setAdminNotesByDate] = useState<Record<string, string>>({});
@@ -177,6 +187,8 @@ export function StudentDashboardPage() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [error, setError] = useState('');
   const skipSubmissionSave = useRef(true);
+  const extraDayLoadedRef = useRef<Set<string>>(new Set());
+  const extraDayInFlightRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user || user.role !== 'student') return;
@@ -220,7 +232,16 @@ export function StudentDashboardPage() {
     });
   }, [user, weekFrom, weekTo]);
 
-  const selectedDate = weekDays[selectedIndex];
+  const expandPastDays = useCallback(() => {
+    setDayOffsetStart((current) => current - STUDENT_DAY_CHUNK);
+    setSelectedIndex((current) => current + STUDENT_DAY_CHUNK);
+  }, []);
+
+  const expandFutureDays = useCallback(() => {
+    setDayOffsetEnd((current) => current + STUDENT_DAY_CHUNK);
+  }, []);
+
+  const selectedDate = days[selectedIndex];
   const selectedDateKey = toDateKey(selectedDate);
   const tasks = tasksByDate[selectedDateKey] ?? [];
   const submission = getSubmissionForDate(submissionsByDate, selectedDateKey);
@@ -234,6 +255,66 @@ export function StudentDashboardPage() {
 
   useEffect(() => {
     if (!user || user.role !== 'student' || isPageLoading) return;
+    const date = days[selectedIndex];
+    if (!date) return;
+    const dateKey = toDateKey(date);
+    if (dateKey >= weekFrom && dateKey <= weekTo) return;
+    if (extraDayLoadedRef.current.has(dateKey) || extraDayInFlightRef.current.has(dateKey)) {
+      return;
+    }
+
+    extraDayInFlightRef.current.add(dateKey);
+    skipSubmissionSave.current = true;
+    let isMounted = true;
+
+    void (async () => {
+      try {
+        const [tasks, submissions, adminNotes, meetings] = await Promise.all([
+          fetchTasksForRange(user.id, dateKey, dateKey),
+          fetchSubmissionsForRange(user.id, dateKey, dateKey),
+          fetchAdminNotesForRange(user.id, dateKey, dateKey),
+          fetchMeetingsForRange(user.id, dateKey, dateKey),
+        ]);
+        if (!isMounted) return;
+        extraDayLoadedRef.current.add(dateKey);
+        extraDayInFlightRef.current.delete(dateKey);
+        skipSubmissionSave.current = true;
+        setTasksByDate((current) => ({
+          ...current,
+          [dateKey]: tasks[dateKey] ?? [],
+        }));
+        setSubmissionsByDate((current) => {
+          if (!submissions[dateKey]) return current;
+          return { ...current, [dateKey]: submissions[dateKey] };
+        });
+        setAdminNotesByDate((current) => {
+          if (adminNotes[dateKey] === undefined) return current;
+          return { ...current, [dateKey]: adminNotes[dateKey] };
+        });
+        setMeetingsByDate((current) => {
+          if (!meetings[dateKey]) return current;
+          return { ...current, [dateKey]: meetings[dateKey] };
+        });
+      } catch {
+        extraDayInFlightRef.current.delete(dateKey);
+        extraDayLoadedRef.current.delete(dateKey);
+        if (isMounted) setError('Gün verileri yüklenemedi.');
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, isPageLoading, selectedIndex, days, weekFrom, weekTo]);
+
+  useEffect(() => {
+    if (!user || user.role !== 'student' || isPageLoading) return;
+
+    const outsideDefaultWeek = selectedDateKey < weekFrom || selectedDateKey > weekTo;
+    if (outsideDefaultWeek && !extraDayLoadedRef.current.has(selectedDateKey)) {
+      skipSubmissionSave.current = true;
+      return;
+    }
 
     if (skipSubmissionSave.current) {
       skipSubmissionSave.current = false;
@@ -247,7 +328,7 @@ export function StudentDashboardPage() {
     }, 700);
 
     return () => window.clearTimeout(timer);
-  }, [submission, selectedDateKey, user, isPageLoading]);
+  }, [submission, selectedDateKey, user, isPageLoading, weekFrom, weekTo]);
 
   if (isLoading) {
     return (
@@ -333,9 +414,13 @@ export function StudentDashboardPage() {
 
           <StudentContain>
             <PreviewDaySlider
-              days={weekDays}
+              days={days}
               selectedIndex={selectedIndex}
               onSelect={setSelectedIndex}
+              todayIndex={todayDayIndex}
+              extendable
+              onNearStart={expandPastDays}
+              onNearEnd={expandFutureDays}
             />
           </StudentContain>
 
