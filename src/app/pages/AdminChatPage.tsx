@@ -4,6 +4,7 @@ import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
   chatAttachmentFileName,
+  CHAT_PAGE_SIZE,
   createChatAttachmentSignedUrl,
   ensureChatThread,
   fetchAdminChatInbox,
@@ -11,6 +12,7 @@ import {
   fetchOrgTasksForDates,
   markChatThreadRead,
   prefetchChatAttachmentUrls,
+  recentChatAttachmentPaths,
   sendChatAttachmentMessage,
   sendChatTextMessage,
   subscribeAdminChatInbox,
@@ -40,6 +42,11 @@ import type { AdminChatInboxItem, ChatMessage, ChatMessageType } from '../types'
 import { getCachedChatSignedUrlSync } from '../utils/chatSignedUrlCache';
 import { toDateKey } from '../utils/dates';
 import { computeCompletionPercent } from '../utils/taskLabel';
+import {
+  cancelBrowserVoiceRecording,
+  startBrowserVoiceRecording,
+  stopBrowserVoiceRecording,
+} from '../utils/voiceRecording';
 
 const CHAT_STAGE_HEIGHT = 'calc(100dvh - 200px)';
 
@@ -802,13 +809,14 @@ export function AdminChatPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const docInputRef = useRef<HTMLInputElement | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const mediaChunksRef = useRef<BlobPart[]>([]);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
   const selectedStudentIdRef = useRef<string | null>(null);
+  const stickToBottomRef = useRef(true);
+  const loadingOlderRef = useRef(false);
 
   const todayKey = useMemo(() => toDateKey(new Date()), []);
 
@@ -922,16 +930,19 @@ export function AdminChatPage() {
     setError('');
     setMessages([]);
     setThreadId(null);
+    setHasMore(false);
+    stickToBottomRef.current = true;
 
     void (async () => {
       try {
         const thread = await ensureChatThread(selectedStudentId);
         if (!mounted) return;
         setThreadId(thread.id);
-        const rows = await fetchChatMessages(thread.id);
+        const rows = await fetchChatMessages(thread.id, { limit: CHAT_PAGE_SIZE });
         if (!mounted) return;
         setMessages(rows);
-        void prefetchChatAttachmentUrls(rows.map((row) => row.attachmentPath));
+        setHasMore(rows.length >= CHAT_PAGE_SIZE);
+        void prefetchChatAttachmentUrls(recentChatAttachmentPaths(rows));
 
         try {
           const read = await markChatThreadRead(thread.id);
@@ -947,6 +958,7 @@ export function AdminChatPage() {
         }
 
         unsubscribe = subscribeChatMessages(thread.id, (message) => {
+          stickToBottomRef.current = true;
           setMessages((current) => {
             if (current.some((entry) => entry.id === message.id)) return current;
             return [...current, message];
@@ -969,12 +981,13 @@ export function AdminChatPage() {
     return () => {
       mounted = false;
       unsubscribe();
+      void cancelBrowserVoiceRecording();
     };
   }, [user, selectedStudentId]);
 
   useEffect(() => {
     const el = listRef.current;
-    if (!el) return;
+    if (!el || !stickToBottomRef.current) return;
     el.scrollTop = el.scrollHeight;
   }, [messages, chatLoading]);
 
@@ -997,6 +1010,36 @@ export function AdminChatPage() {
   const selectedTodayPercent = selectedStudentId
     ? (todayPercentByStudent[selectedStudentId] ?? null)
     : null;
+
+  const loadOlder = async () => {
+    if (!threadId || loadingOlderRef.current || !hasMore || messages.length === 0) return;
+    const el = listRef.current;
+    const previousHeight = el?.scrollHeight ?? 0;
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+    stickToBottomRef.current = false;
+    try {
+      const older = await fetchChatMessages(threadId, {
+        limit: CHAT_PAGE_SIZE,
+        before: messages[0].createdAt,
+      });
+      if (older.length < CHAT_PAGE_SIZE) setHasMore(false);
+      setMessages((current) => {
+        const seen = new Set(current.map((entry) => entry.id));
+        const unique = older.filter((entry) => !seen.has(entry.id));
+        return unique.length ? [...unique, ...current] : current;
+      });
+      requestAnimationFrame(() => {
+        if (!el) return;
+        el.scrollTop = el.scrollHeight - previousHeight;
+      });
+    } catch {
+      setError('Eski mesajlar yüklenemedi.');
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlder(false);
+    }
+  };
 
   const appendMessage = (message: ChatMessage) => {
     setMessages((current) => {
@@ -1051,76 +1094,38 @@ export function AdminChatPage() {
     }
   };
 
-  const stopMediaTracks = () => {
-    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
-    mediaStreamRef.current = null;
-    mediaRecorderRef.current = null;
-    mediaChunksRef.current = [];
-  };
-
   const handleToggleVoice = async () => {
     if (!threadId || sending) return;
 
     if (!recording) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaStreamRef.current = stream;
-        mediaChunksRef.current = [];
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm')
-          ? 'audio/webm'
-          : MediaRecorder.isTypeSupported('audio/mp4')
-            ? 'audio/mp4'
-            : '';
-        const recorder = mimeType
-          ? new MediaRecorder(stream, { mimeType })
-          : new MediaRecorder(stream);
-        mediaRecorderRef.current = recorder;
-        recorder.ondataavailable = (event) => {
-          if (event.data.size > 0) mediaChunksRef.current.push(event.data);
-        };
-        recorder.start();
+        await startBrowserVoiceRecording();
         setRecording(true);
         setError('');
       } catch {
         setError('Mikrofon izni gerekli veya kayıt başlatılamadı.');
-        stopMediaTracks();
+        void cancelBrowserVoiceRecording();
       }
-      return;
-    }
-
-    const recorder = mediaRecorderRef.current;
-    if (!recorder) {
-      setRecording(false);
-      stopMediaTracks();
       return;
     }
 
     setRecording(false);
     setSending(true);
     try {
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        recorder.onstop = () => {
-          resolve(new Blob(mediaChunksRef.current, { type: recorder.mimeType || 'audio/webm' }));
-        };
-        recorder.onerror = () => reject(new Error('record failed'));
-        recorder.stop();
-      });
-      stopMediaTracks();
-      const contentType = blob.type || 'audio/webm';
-      const ext = contentType.includes('mp4') ? 'm4a' : 'webm';
+      const voice = await stopBrowserVoiceRecording();
       appendMessage(
         await sendChatAttachmentMessage({
           threadId,
           senderId: user.id,
           messageType: 'voice',
-          fileName: `voice-${Date.now()}.${ext}`,
-          contentType,
-          data: blob,
+          fileName: voice.fileName,
+          contentType: voice.contentType,
+          data: voice.blob,
         }),
       );
     } catch {
       setError('Sesli mesaj gönderilemedi.');
-      stopMediaTracks();
+      void cancelBrowserVoiceRecording();
     } finally {
       setSending(false);
     }
@@ -1233,7 +1238,16 @@ export function AdminChatPage() {
                 </ChatPanelTitleRow>
                 {chatLoading ? <LoadingText>Sohbet yükleniyor...</LoadingText> : null}
               </ChatPanelHead>
-              <MessageList ref={listRef}>
+              <MessageList
+                ref={listRef}
+                onScroll={(event) => {
+                  const el = event.currentTarget;
+                  stickToBottomRef.current =
+                    el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+                  if (el.scrollTop < 80) void loadOlder();
+                }}
+              >
+                {loadingOlder ? <LoadingText>Eski mesajlar yükleniyor...</LoadingText> : null}
                 {!chatLoading && messages.length === 0 ? (
                   <EmptyChat>Henüz mesaj yok. İlk mesajı sen yazabilirsin.</EmptyChat>
                 ) : null}

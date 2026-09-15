@@ -1310,17 +1310,42 @@ export async function markChatThreadRead(threadId: string): Promise<ChatThread> 
   return mapChatThread(data as DbChatThread);
 }
 
-export async function fetchChatMessages(threadId: string): Promise<ChatMessage[]> {
-  const { data, error } = await supabase
-    .from('chat_messages')
-    .select(
-      'id, organization_id, thread_id, sender_id, body, message_type, attachment_path, created_at',
-    )
-    .eq('thread_id', threadId)
-    .order('created_at', { ascending: true });
+export async function fetchChatMessages(
+  threadId: string,
+  options?: { limit?: number; before?: string },
+): Promise<ChatMessage[]> {
+  const select =
+    'id, organization_id, thread_id, sender_id, body, message_type, attachment_path, created_at';
+  let query = supabase.from('chat_messages').select(select).eq('thread_id', threadId);
 
+  if (options?.before) {
+    query = query.lt('created_at', options.before);
+  }
+
+  if (options?.limit) {
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(options.limit);
+    if (error) throw error;
+    return (data ?? []).map((row) => mapChatMessage(row as DbChatMessage)).reverse();
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: true });
   if (error) throw error;
   return (data ?? []).map((row) => mapChatMessage(row as DbChatMessage));
+}
+
+export const CHAT_PAGE_SIZE = 50;
+export const CHAT_PREFETCH_ATTACHMENT_LIMIT = 12;
+
+export function recentChatAttachmentPaths(
+  messages: ChatMessage[],
+  limit = CHAT_PREFETCH_ATTACHMENT_LIMIT,
+): string[] {
+  const paths: string[] = [];
+  for (let i = messages.length - 1; i >= 0 && paths.length < limit; i--) {
+    const path = messages[i]?.attachmentPath;
+    if (path) paths.push(path);
+  }
+  return paths;
 }
 
 export async function sendChatTextMessage(
