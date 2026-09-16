@@ -176,6 +176,16 @@ export function asStudentGrade(raw: unknown): StudentGrade | null {
   return null;
 }
 
+export type NumericStudentGrade = Exclude<StudentGrade, 'mezun'>;
+
+export function isNumericStudentGrade(grade: StudentGrade | null): grade is NumericStudentGrade {
+  return grade === '9' || grade === '10' || grade === '11' || grade === '12';
+}
+
+export function studentClassPillLabel(grade: NumericStudentGrade): string {
+  return `${grade}. Sınıf`;
+}
+
 export type FinishedStudyStep = {
   id: string;
   subject: string;

@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, EyeOff, Table2, X } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { fetchOrgTasksForRange, fetchStudents } from '../api/appData';
+import { fetchOrgTasksForRange, fetchStudentCoachGrades, fetchStudents } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
-import type { StudentSummary } from '../types';
+import type { NumericStudentGrade, StudentGrade, StudentSummary } from '../types';
+import { isNumericStudentGrade } from '../types';
 import { buildDaysFromOffsets, toDateKey } from '../utils/dates';
 import { preview as t } from '../preview/adminPreviewTheme';
 import {
@@ -131,6 +132,22 @@ const StudentName = styled.span`
   white-space: nowrap;
 `;
 
+const GradeDot = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: ${t.warnSoft};
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: ${t.warn};
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+`;
+
 const StatusIcon = styled.span<{ $ok: boolean }>`
   display: inline-flex;
   align-items: center;
@@ -182,6 +199,7 @@ const HiddenChip = styled.button`
 export function AdminTeaPage() {
   const { user, isLoading } = useAppAuth();
   const [students, setStudents] = useState<StudentSummary[]>([]);
+  const [gradesByStudent, setGradesByStudent] = useState<Record<string, NumericStudentGrade>>({});
   const [taskPresence, setTaskPresence] = useState<Record<string, Record<string, boolean>>>({});
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
   const [pageLoading, setPageLoading] = useState(true);
@@ -204,12 +222,19 @@ export function AdminTeaPage() {
       try {
         const fromDate = dateKeys[0];
         const toDate = dateKeys[dateKeys.length - 1];
-        const [studentRows, orgTasks] = await Promise.all([
+        const [studentRows, orgTasks, grades] = await Promise.all([
           fetchStudents(),
           fetchOrgTasksForRange(fromDate, toDate),
+          fetchStudentCoachGrades().catch((): Record<string, StudentGrade | null> => ({})),
         ]);
 
         if (cancelled) return;
+
+        const numericGrades: Record<string, NumericStudentGrade> = {};
+        for (const student of studentRows) {
+          const grade = grades[student.id];
+          if (isNumericStudentGrade(grade)) numericGrades[student.id] = grade;
+        }
 
         const presence: Record<string, Record<string, boolean>> = {};
         for (const student of studentRows) {
@@ -220,6 +245,7 @@ export function AdminTeaPage() {
         }
 
         setStudents(studentRows);
+        setGradesByStudent(numericGrades);
         setTaskPresence(presence);
       } catch {
         if (!cancelled) setError('Görev analizi yüklenemedi.');
@@ -340,7 +366,9 @@ export function AdminTeaPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleRows.map(({ student, hasTaskByDate }) => (
+                    {visibleRows.map(({ student, hasTaskByDate }) => {
+                      const grade = gradesByStudent[student.id];
+                      return (
                       <tr key={student.id}>
                         <Td>
                           <NameCellInner>
@@ -353,6 +381,11 @@ export function AdminTeaPage() {
                               <EyeOff size={11} strokeWidth={2.4} />
                             </HideButton>
                             <StudentName title={student.name}>{student.name}</StudentName>
+                            {grade ? (
+                              <GradeDot title={`${grade}. Sınıf`} aria-label={`${grade}. Sınıf`}>
+                                {grade}
+                              </GradeDot>
+                            ) : null}
                           </NameCellInner>
                         </Td>
                         {dateKeys.map((dateKey) => {
@@ -374,7 +407,8 @@ export function AdminTeaPage() {
                           );
                         })}
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </MatrixTable>
               </TableScroll>

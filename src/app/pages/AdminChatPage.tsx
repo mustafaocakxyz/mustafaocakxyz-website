@@ -10,6 +10,7 @@ import {
   fetchAdminChatInbox,
   fetchChatMessages,
   fetchOrgTasksForDates,
+  fetchStudentCoachGrades,
   markChatThreadRead,
   prefetchChatAttachmentUrls,
   recentChatAttachmentPaths,
@@ -38,7 +39,8 @@ import {
   TopBarEnd,
   TopBarTitle,
 } from '../preview/AdminPreviewUi';
-import type { AdminChatInboxItem, ChatMessage, ChatMessageType } from '../types';
+import type { AdminChatInboxItem, ChatMessage, ChatMessageType, NumericStudentGrade, StudentGrade } from '../types';
+import { isNumericStudentGrade, studentClassPillLabel } from '../types';
 import { getCachedChatSignedUrlSync } from '../utils/chatSignedUrlCache';
 import { toDateKey } from '../utils/dates';
 import { computeCompletionPercent } from '../utils/taskLabel';
@@ -800,6 +802,7 @@ export function AdminChatPage() {
   const [todayPercentByStudent, setTodayPercentByStudent] = useState<Record<string, number | null>>(
     {},
   );
+  const [gradesByStudent, setGradesByStudent] = useState<Record<string, NumericStudentGrade>>({});
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -889,19 +892,24 @@ export function AdminChatPage() {
     setPageLoading(true);
     void (async () => {
       try {
-        const [rows, orgTasks] = await Promise.all([
+        const [rows, orgTasks, grades] = await Promise.all([
           fetchAdminChatInbox(),
           fetchOrgTasksForDates([todayKey]),
+          fetchStudentCoachGrades().catch((): Record<string, StudentGrade | null> => ({})),
         ]);
         if (!mounted) return;
         setInbox(rows);
         const percents: Record<string, number | null> = {};
+        const numericGrades: Record<string, NumericStudentGrade> = {};
         for (const item of rows) {
           const todayTasks = orgTasks[item.studentId]?.[todayKey] ?? [];
           percents[item.studentId] =
             todayTasks.length === 0 ? null : (computeCompletionPercent(todayTasks) ?? 0);
+          const grade = grades[item.studentId];
+          if (isNumericStudentGrade(grade)) numericGrades[item.studentId] = grade;
         }
         setTodayPercentByStudent(percents);
+        setGradesByStudent(numericGrades);
       } catch {
         if (mounted) setError('Öğrenciler yüklenemedi.');
       } finally {
@@ -1010,6 +1018,7 @@ export function AdminChatPage() {
   const selectedTodayPercent = selectedStudentId
     ? (todayPercentByStudent[selectedStudentId] ?? null)
     : null;
+  const selectedGrade = selectedStudentId ? (gradesByStudent[selectedStudentId] ?? null) : null;
 
   const loadOlder = async () => {
     if (!threadId || loadingOlderRef.current || !hasMore || messages.length === 0) return;
@@ -1234,6 +1243,9 @@ export function AdminChatPage() {
                     <StatusChip $tone={completionTone(selectedTodayPercent)}>
                       Bugün {formatCompletionLabel(selectedTodayPercent)}
                     </StatusChip>
+                  ) : null}
+                  {selectedGrade ? (
+                    <StatusChip $tone="warn">{studentClassPillLabel(selectedGrade)}</StatusChip>
                   ) : null}
                 </ChatPanelTitleRow>
                 {chatLoading ? <LoadingText>Sohbet yükleniyor...</LoadingText> : null}

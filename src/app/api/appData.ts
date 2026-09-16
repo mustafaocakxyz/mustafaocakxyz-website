@@ -40,6 +40,7 @@ import {
   type PasswordResetRequest,
   type StudentCoachNotes,
   type StudentCurriculumState,
+  type StudentGrade,
   type StudentMeeting,
   type StudentSummary,
   type StudentTask,
@@ -770,6 +771,16 @@ function mapStudentCoachNotes(row: DbStudentCoachNotes): StudentCoachNotes {
     finishedSteps: parseFinishedSteps(row.finished_steps),
     updatedAt: row.updated_at ?? null,
   };
+}
+
+export async function fetchStudentCoachGrades(): Promise<Record<string, StudentGrade | null>> {
+  const { data, error } = await supabase.from('student_coach_notes').select('student_id, grade');
+  if (error) throw error;
+  const grades: Record<string, StudentGrade | null> = {};
+  for (const row of data ?? []) {
+    grades[row.student_id as string] = asStudentGrade(row.grade);
+  }
+  return grades;
 }
 
 export async function fetchStudentCoachNotes(studentId: string): Promise<StudentCoachNotes> {
