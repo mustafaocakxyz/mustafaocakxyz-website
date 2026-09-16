@@ -215,6 +215,23 @@ export function formatDenemeNet(net: number): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
 }
 
+/** Newest-first last 3 denemes of a type; average of their nets. Null if none. */
+export function lastThreeDenemeAverage(
+  entries: Array<{ typeId: string; denemeDate: string; createdAt: string; scores: DenemeLeafScore[] }>,
+  typeId: string,
+): { average: number; count: number } | null {
+  const newest = entries
+    .filter((entry) => entry.typeId === typeId)
+    .sort((a, b) => {
+      if (a.denemeDate !== b.denemeDate) return a.denemeDate < b.denemeDate ? 1 : -1;
+      return a.createdAt < b.createdAt ? 1 : -1;
+    })
+    .slice(0, 3);
+  if (newest.length === 0) return null;
+  const sum = newest.reduce((total, entry) => total + computeDenemeNet(entry.typeId, entry.scores), 0);
+  return { average: sum / newest.length, count: newest.length };
+}
+
 export function validateLeafScore(
   leaf: DenemeLeafDef,
   correct: number,

@@ -13,13 +13,16 @@ import {
   type DbDenemeLeafScore,
   type DbMaterialTopicProgress,
   type DbProfile,
+  type DbStudentCoachNotes,
   type DbStudentMaterial,
   type DbStudentMeeting,
   type DbStudentSubject,
   type DbSubjectTopicProgress,
 } from '../../lib/supabase';
 import {
+  asStudentGrade,
   emptyDailySubmission,
+  emptyStudentCoachNotes,
   type ChatMessage,
   type ChatThread,
   type AdminChatInboxItem,
@@ -32,8 +35,10 @@ import {
   type DenemeEntry,
   type DenemeEntryInput,
   type DenemeLeafScore,
+  type FinishedStudyStep,
   type StudentAdminSettings,
   type PasswordResetRequest,
+  type StudentCoachNotes,
   type StudentCurriculumState,
   type StudentMeeting,
   type StudentSummary,
@@ -734,6 +739,75 @@ export async function updateDenemeEntry(
 export async function deleteDenemeEntry(denemeId: string): Promise<void> {
   const { error } = await supabase.from('deneme_entries').delete().eq('id', denemeId);
   if (error) throw error;
+}
+
+function parseFinishedSteps(raw: unknown): FinishedStudyStep[] {
+  if (!Array.isArray(raw)) return [];
+  const steps: FinishedStudyStep[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as { id?: unknown; subject?: unknown; dateLabel?: unknown; date_label?: unknown };
+    const subject = typeof row.subject === 'string' ? row.subject.trim() : '';
+    const dateLabel =
+      typeof row.dateLabel === 'string'
+        ? row.dateLabel.trim()
+        : typeof row.date_label === 'string'
+          ? row.date_label.trim()
+          : '';
+    const id = typeof row.id === 'string' && row.id ? row.id : crypto.randomUUID();
+    if (!subject && !dateLabel) continue;
+    steps.push({ id, subject, dateLabel });
+  }
+  return steps;
+}
+
+function mapStudentCoachNotes(row: DbStudentCoachNotes): StudentCoachNotes {
+  return {
+    studentId: row.student_id,
+    grade: asStudentGrade(row.grade),
+    coachNotes: row.coach_notes ?? '',
+    currentStep: row.current_step ?? '',
+    finishedSteps: parseFinishedSteps(row.finished_steps),
+    updatedAt: row.updated_at ?? null,
+  };
+}
+
+export async function fetchStudentCoachNotes(studentId: string): Promise<StudentCoachNotes> {
+  const { data, error } = await supabase
+    .from('student_coach_notes')
+    .select('student_id, organization_id, grade, coach_notes, current_step, finished_steps, created_at, updated_at')
+    .eq('student_id', studentId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return emptyStudentCoachNotes(studentId);
+  return mapStudentCoachNotes(data as DbStudentCoachNotes);
+}
+
+export async function upsertStudentCoachNotes(
+  studentId: string,
+  input: Pick<StudentCoachNotes, 'grade' | 'coachNotes' | 'currentStep' | 'finishedSteps'>,
+): Promise<StudentCoachNotes> {
+  const payload = {
+    student_id: studentId,
+    grade: input.grade,
+    coach_notes: input.coachNotes,
+    current_step: input.currentStep,
+    finished_steps: input.finishedSteps.map((step) => ({
+      id: step.id,
+      subject: step.subject,
+      dateLabel: step.dateLabel,
+    })),
+  };
+
+  const { data, error } = await supabase
+    .from('student_coach_notes')
+    .upsert(payload, { onConflict: 'student_id' })
+    .select('student_id, organization_id, grade, coach_notes, current_step, finished_steps, created_at, updated_at')
+    .single();
+
+  if (error) throw error;
+  return mapStudentCoachNotes(data as DbStudentCoachNotes);
 }
 
 export async function fetchSubmissionsForRange(

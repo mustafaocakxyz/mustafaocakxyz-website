@@ -24,6 +24,7 @@ import {
   fetchStudentCurriculumState,
   fetchStudentIdsWithMeetingsInRange,
   fetchStudentAdminSettings,
+  fetchStudentCoachNotes,
   fetchStudents,
   fetchSubmissionsForRange,
   fetchTasksForRange,
@@ -41,22 +42,26 @@ import {
   upsertAdminNote,
   upsertMaterialTopicProgress,
   upsertMeeting,
+  upsertStudentCoachNotes,
   upsertSubjectTopicProgress,
 } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
+import { CoachNotesPanel } from '../components/CoachNotesPanel';
 import { DenemePanel } from '../components/DenemePanel';
 import { KonuMateryalPanel } from '../components/KonuMateryalPanel';
-import type {
-  CurriculumCatalog,
-  DailySubmission,
-  DenemeEntry,
-  DenemeEntryInput,
-  StudentCurriculumState,
-  StudentMeeting,
-  StudentSummary,
-  StudentTask,
-  TaskTopicLink,
-  TopicStatus,
+import {
+  emptyStudentCoachNotes,
+  type CurriculumCatalog,
+  type DailySubmission,
+  type DenemeEntry,
+  type DenemeEntryInput,
+  type StudentCoachNotes,
+  type StudentCurriculumState,
+  type StudentMeeting,
+  type StudentSummary,
+  type StudentTask,
+  type TaskTopicLink,
+  type TopicStatus,
 } from '../types';
 import {
   addDaysToDateKey,
@@ -67,7 +72,6 @@ import {
 } from '../utils/dates';
 import { downloadJson } from '../utils/download';
 import { computeCompletionPercent } from '../utils/taskLabel';
-import { CoachNotesSection } from '../preview/AdminPreviewSections';
 import {
   PreviewDayNoteRail,
   PreviewFormSection,
@@ -394,6 +398,8 @@ export function AdminPreviewPage() {
   const [meetingsByDate, setMeetingsByDate] = useState<Record<string, StudentMeeting>>({});
   const [denemes, setDenemes] = useState<DenemeEntry[]>([]);
   const denemeCacheRef = useRef<Map<string, DenemeEntry[]>>(new Map());
+  const [coachNotes, setCoachNotes] = useState<StudentCoachNotes>(() => emptyStudentCoachNotes(''));
+  const coachNotesCacheRef = useRef<Map<string, StudentCoachNotes>>(new Map());
   const [curriculumCatalog, setCurriculumCatalog] = useState<CurriculumCatalog>({
     subjects: [],
     materials: [],
@@ -509,7 +515,9 @@ export function AdminPreviewPage() {
     setError('');
     weekCacheRef.current.clear();
     denemeCacheRef.current.clear();
+    coachNotesCacheRef.current.clear();
     setDenemes([]);
+    setCoachNotes(emptyStudentCoachNotes(''));
     setCurriculumByStudent({});
 
     const bump = (value: number) => {
@@ -742,6 +750,29 @@ export function AdminPreviewPage() {
     applyWeekSnapshot,
     writeWeekCache,
   ]);
+
+  useEffect(() => {
+    if (isBootstrapping || !selectedStudentId) return;
+    const studentId = selectedStudentId;
+    let mounted = true;
+    const cached = coachNotesCacheRef.current.get(studentId);
+    setCoachNotes(cached ?? emptyStudentCoachNotes(studentId));
+
+    void (async () => {
+      try {
+        const row = await fetchStudentCoachNotes(studentId);
+        if (!mounted) return;
+        coachNotesCacheRef.current.set(studentId, row);
+        setCoachNotes(row);
+      } catch {
+        if (mounted) setError('Notlar yüklenemedi.');
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [isBootstrapping, selectedStudentId]);
 
   const expandPastDays = useCallback(() => {
     setDayOffsetStart((current) => current - ADMIN_DAY_CHUNK);
@@ -1132,6 +1163,15 @@ export function AdminPreviewPage() {
       denemeCacheRef.current.set(selectedStudent.id, next);
       return next;
     });
+  };
+
+  const handleSaveCoachNotes = async (
+    next: Pick<StudentCoachNotes, 'grade' | 'coachNotes' | 'currentStep' | 'finishedSteps'>,
+  ) => {
+    if (!selectedStudent) return;
+    const saved = await upsertStudentCoachNotes(selectedStudent.id, next);
+    coachNotesCacheRef.current.set(selectedStudent.id, saved);
+    setCoachNotes(saved);
   };
 
   const emptyCurriculum = (): StudentCurriculumState => ({
@@ -1557,7 +1597,16 @@ export function AdminPreviewPage() {
 
                 {section === 'notes' ? (
                   <ContentCard>
-                    <CoachNotesSection studentName={selectedStudent.name} />
+                    <CoachNotesPanel
+                      key={selectedStudent.id}
+                      notes={
+                        coachNotes.studentId === selectedStudent.id
+                          ? coachNotes
+                          : emptyStudentCoachNotes(selectedStudent.id)
+                      }
+                      denemes={denemes}
+                      onSave={handleSaveCoachNotes}
+                    />
                   </ContentCard>
                 ) : null}
               </>

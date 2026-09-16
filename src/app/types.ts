@@ -156,6 +156,52 @@ export type DenemeEntryInput = {
   topics: string[];
 };
 
+export type StudentGrade = '9' | '10' | '11' | '12' | 'mezun';
+
+export const STUDENT_GRADES: { id: StudentGrade; label: string }[] = [
+  { id: '9', label: '9' },
+  { id: '10', label: '10' },
+  { id: '11', label: '11' },
+  { id: '12', label: '12' },
+  { id: 'mezun', label: 'Mezun' },
+];
+
+export function studentGradeLabel(grade: StudentGrade | null): string {
+  if (!grade) return '—';
+  return STUDENT_GRADES.find((item) => item.id === grade)?.label ?? grade;
+}
+
+export function asStudentGrade(raw: unknown): StudentGrade | null {
+  if (raw === '9' || raw === '10' || raw === '11' || raw === '12' || raw === 'mezun') return raw;
+  return null;
+}
+
+export type FinishedStudyStep = {
+  id: string;
+  subject: string;
+  dateLabel: string;
+};
+
+export type StudentCoachNotes = {
+  studentId: string;
+  grade: StudentGrade | null;
+  coachNotes: string;
+  currentStep: string;
+  finishedSteps: FinishedStudyStep[];
+  updatedAt: string | null;
+};
+
+export function emptyStudentCoachNotes(studentId: string): StudentCoachNotes {
+  return {
+    studentId,
+    grade: null,
+    coachNotes: '',
+    currentStep: '',
+    finishedSteps: [],
+    updatedAt: null,
+  };
+}
+
 /** Subject / material topic progress states. */
 export type TopicStatus = 'none' | 'current' | 'completed_warn' | 'completed_ok';
 

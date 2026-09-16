@@ -171,3 +171,14 @@ export type DbMaterialTopicProgress = {
   correct_count: number | null;
   question_count: number | null;
 };
+
+export type DbStudentCoachNotes = {
+  student_id: string;
+  organization_id: string;
+  grade: string | null;
+  coach_notes: string;
+  current_step: string;
+  finished_steps: unknown;
+  created_at: string;
+  updated_at: string;
+};

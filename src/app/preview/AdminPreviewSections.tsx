@@ -10,36 +10,6 @@ import {
   ProgressTrack,
 } from './AdminPreviewUi';
 
-const FieldStack = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-`;
-
-const FieldLabel = styled.label`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: ${t.muted};
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-`;
-
-const FieldBox = styled.div`
-  padding: 12px 14px;
-  border-radius: ${t.radiusSm};
-  border: 1px solid ${t.border};
-  background: ${t.panel2};
-  color: ${t.text};
-  font-size: 0.92rem;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0;
-  line-height: 1.45;
-`;
-
 const Tag = styled.span`
   display: inline-flex;
   align-items: center;
@@ -163,34 +133,3 @@ export function DenemeSection({ studentName }: { studentName: string }) {
   );
 }
 
-const COACH_FIELDS = [
-  { key: 'baslangic', label: 'Başlangıç durumu', value: 'TYT temeli zayıf, paragraf güçlü.' },
-  { key: 'guncel', label: 'Güncel durum', value: 'Düzenli tempo; matematik ivmesi yavaş.' },
-  { key: 'biten', label: 'Geçmişte bitirilen dersler', value: 'TYT Türkçe konu seti, temel geometri.' },
-  { key: 'odak', label: 'Güncel çalışma odağı', value: 'Problemler + AYT türev giriş.' },
-  { key: 'sonraki', label: 'Bir sonraki çalışma adımı', value: 'Yanlış defteri + 2 branş deneme.' },
-  { key: 'tarih', label: 'Güncelleme tarihi', value: '2026-07-28' },
-] as const;
-
-export function CoachNotesSection({ studentName }: { studentName: string }) {
-  return (
-    <FieldStack>
-      <div>
-        <ContentTitle>Notlar</ContentTitle>
-        <ContentSub style={{ marginTop: 4 }}>
-          {studentName} — Phase 2 önizlemesi (kayıt yok, örnek alanlar).
-        </ContentSub>
-      </div>
-      {COACH_FIELDS.map((field) => (
-        <FieldLabel key={field.key}>
-          {field.label}
-          <FieldBox>{field.value}</FieldBox>
-        </FieldLabel>
-      ))}
-      <FieldLabel>
-        Notlar
-        <FieldBox>Motivasyon iyi; aile ile tempo konuşulacak.</FieldBox>
-      </FieldLabel>
-    </FieldStack>
-  );
-}
