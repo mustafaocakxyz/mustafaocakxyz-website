@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, EyeOff, Table2, X } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { fetchOrgTasksForRange, fetchStudentCoachGrades, fetchStudents } from '../api/appData';
+import { fetchOrgTasksForRange, fetchStudentCoachGrades, fetchStudents, subscribeDailyTasks } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
 import type { NumericStudentGrade, StudentGrade, StudentSummary } from '../types';
 import { isNumericStudentGrade } from '../types';
@@ -215,13 +215,41 @@ export function AdminTeaPage() {
     if (!user || user.role !== 'admin') return;
 
     let cancelled = false;
+    let refreshTimer: number | undefined;
+    const fromDate = dateKeys[0];
+    const toDate = dateKeys[dateKeys.length - 1];
 
-    const load = async () => {
-      setPageLoading(true);
-      setError('');
+    const presenceFromTasks = (
+      studentRows: StudentSummary[],
+      orgTasks: Awaited<ReturnType<typeof fetchOrgTasksForRange>>,
+    ) => {
+      const presence: Record<string, Record<string, boolean>> = {};
+      for (const student of studentRows) {
+        presence[student.id] = {};
+        for (const dateKey of dateKeys) {
+          presence[student.id][dateKey] = (orgTasks[student.id]?.[dateKey]?.length ?? 0) > 0;
+        }
+      }
+      return presence;
+    };
+
+    const load = async (silent: boolean) => {
+      if (!silent) {
+        setPageLoading(true);
+        setError('');
+      }
       try {
-        const fromDate = dateKeys[0];
-        const toDate = dateKeys[dateKeys.length - 1];
+        if (silent) {
+          const [studentRows, orgTasks] = await Promise.all([
+            fetchStudents(),
+            fetchOrgTasksForRange(fromDate, toDate),
+          ]);
+          if (cancelled) return;
+          setStudents(studentRows);
+          setTaskPresence(presenceFromTasks(studentRows, orgTasks));
+          return;
+        }
+
         const [studentRows, orgTasks, grades] = await Promise.all([
           fetchStudents(),
           fetchOrgTasksForRange(fromDate, toDate),
@@ -236,27 +264,46 @@ export function AdminTeaPage() {
           if (isNumericStudentGrade(grade)) numericGrades[student.id] = grade;
         }
 
-        const presence: Record<string, Record<string, boolean>> = {};
-        for (const student of studentRows) {
-          presence[student.id] = {};
-          for (const dateKey of dateKeys) {
-            presence[student.id][dateKey] = (orgTasks[student.id]?.[dateKey]?.length ?? 0) > 0;
-          }
-        }
-
         setStudents(studentRows);
         setGradesByStudent(numericGrades);
-        setTaskPresence(presence);
+        setTaskPresence(presenceFromTasks(studentRows, orgTasks));
       } catch {
-        if (!cancelled) setError('Görev analizi yüklenemedi.');
+        if (!cancelled && !silent) setError('Görev analizi yüklenemedi.');
       } finally {
-        if (!cancelled) setPageLoading(false);
+        if (!cancelled && !silent) setPageLoading(false);
       }
     };
 
-    void load();
+    const scheduleSilentRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        void load(true);
+      }, 250);
+    };
+
+    void load(false);
+
+    const unsubscribe = user.organizationId
+      ? subscribeDailyTasks({ organizationId: user.organizationId }, (change) => {
+          if (change.dateKey && (change.dateKey < fromDate || change.dateKey > toDate)) {
+            return;
+          }
+          scheduleSilentRefresh();
+        })
+      : () => {};
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') scheduleSilentRefresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(refreshTimer);
+      unsubscribe();
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
     };
   }, [user, dateKeys]);
 
