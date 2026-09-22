@@ -386,6 +386,7 @@ export function AdminPreviewPage() {
 
   const [students, setStudents] = useState<StudentSummary[]>([]);
   const [monthlyEarnings, setMonthlyEarnings] = useState(0);
+  const [earningsOpen, setEarningsOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [selectedDayIndex, setSelectedDayIndex] = useState(ADMIN_TODAY_INDEX);
   const [section, setSection] = useState<SectionId>('tasks');
@@ -1366,12 +1367,25 @@ export function AdminPreviewPage() {
           >
             <Settings size={16} strokeWidth={2.4} />
           </TopBarIconButton>
-          <EarningsBadge title="Aylık kazanç = öğrenci katkıları toplamı (Kapalı / 5000 / 6000 ₺)">
+          <EarningsBadge
+            type="button"
+            $expanded={earningsOpen}
+            title="Aylık kazanç = öğrenci katkıları toplamı (Kapalı / 5000 / 6000 ₺)"
+            aria-expanded={earningsOpen}
+            aria-label={
+              earningsOpen
+                ? `Aylık kazanç ${formatMonthlyEarnings(monthlyEarnings)}. Gizlemek için tıkla.`
+                : 'Aylık kazancı göster'
+            }
+            onClick={() => setEarningsOpen((open) => !open)}
+          >
             <LiveDotWrap aria-hidden>
               <LiveDotPulse />
               <LiveDotCore />
             </LiveDotWrap>
-            <EarningsAmount>{formatMonthlyEarnings(monthlyEarnings)}</EarningsAmount>
+            {earningsOpen ? (
+              <EarningsAmount>{formatMonthlyEarnings(monthlyEarnings)}</EarningsAmount>
+            ) : null}
           </EarningsBadge>
         </TopBarEnd>
       </PreviewTopBar>

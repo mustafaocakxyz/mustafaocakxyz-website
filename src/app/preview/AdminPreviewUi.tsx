@@ -148,14 +148,26 @@ export const TopBarEnd = styled.div`
   }
 `;
 
-export const EarningsBadge = styled.div`
+export const EarningsBadge = styled.button<{ $expanded?: boolean }>`
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
+  justify-content: center;
+  gap: ${({ $expanded }) => ($expanded ? '10px' : '0')};
+  min-width: ${({ $expanded }) => ($expanded ? 'auto' : '32px')};
+  min-height: 32px;
+  padding: ${({ $expanded }) => ($expanded ? '9px 14px' : '6px')};
   border-radius: 999px;
-  border: 1px solid rgba(52, 211, 153, 0.35);
-  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid
+    ${({ $expanded }) => ($expanded ? 'rgba(52, 211, 153, 0.35)' : 'transparent')};
+  background: ${({ $expanded }) => ($expanded ? 'rgba(16, 185, 129, 0.12)' : 'transparent')};
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    border-color: rgba(52, 211, 153, 0.45);
+    background: rgba(16, 185, 129, 0.16);
+  }
 `;
 
 export const LiveDotWrap = styled.span`
