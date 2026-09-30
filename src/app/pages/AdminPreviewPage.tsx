@@ -121,12 +121,22 @@ import {
   ChatGlowButton,
   ChatUnreadBadge,
   TopBarActions,
+  TopBarButton,
   TopBarIconButton,
   TopBarEnd,
   TopBarTitle,
 } from '../preview/AdminPreviewUi';
 import { resolvePublicDaysInProgram } from '../../lib/fetchPublicStudentShowcase';
 import { preview as t } from '../preview/adminPreviewTheme';
+
+const TopBarLead = styled.div`
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+`;
 
 /** Default week still yesterday→+5; slider starts padded so admin can scroll out. */
 const ADMIN_DAY_PAD = 14;
@@ -1309,7 +1319,12 @@ export function AdminPreviewPage() {
   return (
     <PreviewShell>
       <PreviewTopBar>
-        <TopBarTitle>Admin Paneli</TopBarTitle>
+        <TopBarLead>
+          <TopBarTitle>Admin Paneli</TopBarTitle>
+          <TopBarButton as={Link} to="/app/admin/assistant-results">
+            Asistan sonuçları
+          </TopBarButton>
+        </TopBarLead>
         <TopBarActions>
           <ChatGlowButton as={Link} to="/app/admin/chat" $active={chatUnreadTotal > 0}>
             Sohbet
