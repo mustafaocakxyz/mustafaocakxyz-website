@@ -322,6 +322,16 @@ const AVERAGE_TONES: Record<
     border: 'rgba(99, 102, 241, 0.48)',
     text: 'rgba(224, 231, 255, 0.98)',
   },
+  paragraf: {
+    bg: 'rgba(249, 115, 22, 0.2)',
+    border: 'rgba(249, 115, 22, 0.45)',
+    text: 'rgba(255, 237, 213, 0.98)',
+  },
+  ayt_matematik: {
+    bg: 'rgba(14, 165, 233, 0.2)',
+    border: 'rgba(14, 165, 233, 0.48)',
+    text: 'rgba(224, 242, 254, 0.98)',
+  },
 };
 
 const AverageRow = styled.div<{ $bg: string; $border: string; $text: string }>`

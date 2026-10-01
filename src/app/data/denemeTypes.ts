@@ -7,7 +7,9 @@ export type DenemeTypeId =
   | 'tyt_matematik'
   | 'tyt_fen'
   | 'tyt_sosyal'
-  | 'tyt_genel';
+  | 'paragraf'
+  | 'tyt_genel'
+  | 'ayt_matematik';
 
 /** How D/Y/B are entered for a leaf. Future types use one of these. */
 export type DenemeEntryMode = 'capped' | 'flexible';
@@ -76,6 +78,46 @@ const TYT_MATEMATIK_EXTRA_TOPICS = [
   'Veri – İstatistik',
 ] as const;
 
+const AYT_MATEMATIK_TOPICS = [
+  'Temel Kavramlar',
+  'Sayı Basamakları',
+  'Bölme ve Bölünebilme',
+  'EBOB - EKOK',
+  'Rasyonel Sayılar',
+  'Basit Eşitsizlikler',
+  'Mutlak Değer',
+  'Üslü Sayılar',
+  'Köklü Sayılar',
+  'Çarpanlara Ayırma',
+  'Oran Orantı',
+  'Denklem Çözme',
+  'Problemler',
+  'Kümeler',
+  'Kartezyen Çarpım',
+  'Mantık',
+  'Fonksiyonlar',
+  'Polinomlar',
+  '2.Dereceden Denklemler',
+  'Permütasyon ve Kombinasyon',
+  'Binom ve Olasılık',
+  'İstatistik',
+  'Karmaşık Sayılar',
+  '2.Dereceden Eşitsizlikler',
+  'Parabol',
+  'Trigonometri',
+  'Logaritma',
+  'Diziler',
+  'Limit',
+  'Türev',
+  'İntegral',
+  'Üçgenler',
+  'Dörtgenler',
+  'Çokgenler',
+  'Analitik Geometri',
+  'Çember ve Daire',
+  'Katı Cisimler',
+] as const;
+
 export const DENEME_TYPES: DenemeTypeDef[] = [
   {
     id: 'sayilar',
@@ -126,6 +168,12 @@ export const DENEME_TYPES: DenemeTypeDef[] = [
     topicPresets: [],
   },
   {
+    id: 'paragraf',
+    label: 'Paragraf',
+    leaves: [{ id: 'paragraf', label: 'Paragraf', entryMode: 'flexible' }],
+    topicPresets: [],
+  },
+  {
     id: 'tyt_genel',
     label: 'TYT Genel',
     leaves: [
@@ -141,6 +189,12 @@ export const DENEME_TYPES: DenemeTypeDef[] = [
       { id: 'biyoloji', label: 'Biyoloji', entryMode: 'capped', questionCount: 6, group: 'TYT Fen' },
     ],
     topicPresets: [],
+  },
+  {
+    id: 'ayt_matematik',
+    label: 'AYT Matematik',
+    leaves: [{ id: 'ayt_matematik', label: 'AYT Matematik', entryMode: 'capped', questionCount: 40 }],
+    topicPresets: [...AYT_MATEMATIK_TOPICS],
   },
 ];
 

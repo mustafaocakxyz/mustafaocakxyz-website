@@ -29,6 +29,7 @@ export const SUBJECT_DENEME_SOURCES: Record<string, SubjectDenemeSource[]> = {
   ],
   sayilar: [{ typeId: 'sayilar' }],
   problemler: [{ typeId: 'problemler' }],
+  ayt_matematik: [{ typeId: 'ayt_matematik' }],
 };
 
 const LAST_N = 4;
