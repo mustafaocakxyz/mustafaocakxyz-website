@@ -78,6 +78,8 @@ export type DbChatThread = {
   last_sender_id?: string | null;
   admin_last_read_at?: string | null;
   admin_unread_count?: number;
+  admin_marked_unread?: boolean;
+  admin_read_revision?: number;
   created_at: string;
   updated_at: string;
 };
@@ -91,6 +93,7 @@ export type DbChatMessage = {
   message_type: 'text' | 'image' | 'document' | 'voice' | 'system';
   attachment_path: string | null;
   created_at: string;
+  edited_at?: string | null;
 };
 
 export type DbDenemeLeafScore = {

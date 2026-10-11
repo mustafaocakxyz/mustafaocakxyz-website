@@ -1,23 +1,27 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ArrowDownWideNarrow } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ArrowDownWideNarrow, MoreVertical } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
   chatAttachmentFileName,
   CHAT_PAGE_SIZE,
   createChatAttachmentSignedUrl,
+  deleteOwnChatMessage,
   ensureChatThread,
   fetchAdminChatInbox,
   fetchChatMessages,
   fetchOrgTasksForDates,
   fetchStudentCoachGrades,
   markChatThreadRead,
+  markChatThreadUnread,
   prefetchChatAttachmentUrls,
   recentChatAttachmentPaths,
   sendChatAttachmentMessage,
   sendChatTextMessage,
   subscribeAdminChatInbox,
   subscribeChatMessages,
+  updateOwnChatMessage,
 } from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
 import { preview as t } from '../preview/adminPreviewTheme';
@@ -139,25 +143,91 @@ const StudentList = styled.div`
   }
 `;
 
-const InboxRow = styled.button<{ $selected: boolean }>`
+const InboxRow = styled.div<{ $selected: boolean }>`
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 10px;
+  align-items: center;
   width: 100%;
-  text-align: left;
-  padding: 10px 12px;
   border-radius: ${t.radiusMd};
   border: 1px solid ${({ $selected }) => ($selected ? 'rgba(96, 165, 250, 0.55)' : t.border)};
   background: ${({ $selected }) => ($selected ? 'rgba(59, 130, 246, 0.14)' : t.panel2)};
   color: inherit;
-  font: inherit;
-  cursor: pointer;
   box-shadow: ${({ $selected }) =>
     $selected ? '0 0 0 1px rgba(96, 165, 250, 0.2), 0 0 16px rgba(59, 130, 246, 0.22)' : 'none'};
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 
   &:hover {
     border-color: rgba(96, 165, 250, 0.4);
+  }
+`;
+
+const InboxOpenButton = styled.button`
+  display: block;
+  min-width: 0;
+  width: 100%;
+  text-align: left;
+  padding: 10px 4px 10px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+`;
+
+const InboxMenuButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: ${t.muted};
+  cursor: pointer;
+
+  &:hover,
+  &[aria-expanded='true'] {
+    border-color: ${t.border};
+    background: rgba(15, 23, 42, 0.55);
+    color: ${t.text};
+  }
+`;
+
+const InboxMenu = styled.div`
+  position: fixed;
+  z-index: 80;
+  min-width: 220px;
+  padding: 6px;
+  border-radius: ${t.radiusSm};
+  border: 1px solid ${t.borderStrong};
+  background: ${t.panel};
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+`;
+
+const InboxMenuItem = styled.button`
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: ${t.text};
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: rgba(59, 130, 246, 0.16);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
 `;
 
@@ -328,9 +398,17 @@ const ComposerWrap = styled.div`
   gap: 8px;
 `;
 
-const Bubble = styled.div<{ $mine: boolean }>`
+const BubbleBlock = styled.div<{ $mine: boolean }>`
   align-self: ${({ $mine }) => ($mine ? 'flex-end' : 'flex-start')};
+  display: flex;
+  flex-direction: column;
+  align-items: ${({ $mine }) => ($mine ? 'flex-end' : 'flex-start')};
   max-width: min(80%, 480px);
+  gap: 4px;
+`;
+
+const Bubble = styled.div<{ $mine: boolean }>`
+  max-width: 100%;
   padding: 10px 14px;
   border-radius: ${t.radiusMd};
   border: 1px solid
@@ -341,6 +419,92 @@ const Bubble = styled.div<{ $mine: boolean }>`
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+`;
+
+const ConfirmHint = styled.span`
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: ${t.muted};
+`;
+
+const BubbleActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px;
+`;
+
+const BubbleAction = styled.button`
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: ${t.mutedSoft};
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: ${t.text};
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const BubbleActionDanger = styled(BubbleAction)`
+  &:hover:not(:disabled) {
+    color: ${t.danger};
+  }
+`;
+
+const EditArea = styled.textarea`
+  display: block;
+  width: 240px;
+  max-width: 100%;
+  min-height: 72px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: ${t.radiusSm};
+  border: 1px solid ${t.borderStrong};
+  background: rgba(15, 23, 42, 0.55);
+  color: ${t.text};
+  font-size: 0.92rem;
+  font-family: inherit;
+  line-height: 1.45;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+
+  &:focus {
+    border-color: ${t.accentBorder};
+  }
+`;
+
+const QuietAction = styled.button`
+  margin-left: auto;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid ${t.borderStrong};
+  background: transparent;
+  color: ${t.muted};
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: ${t.text};
+    border-color: rgba(96, 165, 250, 0.45);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const Meta = styled.span`
@@ -583,6 +747,22 @@ function formatInboxTime(iso: string | null): string {
   return new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(date);
 }
 
+function inboxShowsUnread(
+  item: Pick<AdminChatInboxItem, 'unreadCount' | 'markedUnread'>,
+): boolean {
+  return item.unreadCount > 0 || item.markedUnread;
+}
+
+function inboxBadgeCount(item: Pick<AdminChatInboxItem, 'unreadCount' | 'markedUnread'>): number {
+  return item.unreadCount > 0 ? item.unreadCount : 1;
+}
+
+type InboxMenuState = {
+  studentId: string;
+  x: number;
+  y: number;
+};
+
 function previewLabel(
   item: Pick<AdminChatInboxItem, 'lastMessagePreview' | 'lastMessageType' | 'lastSenderId'>,
   currentUserId: string,
@@ -814,9 +994,16 @@ export function AdminChatPage() {
   const [recording, setRecording] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [messageBusyId, setMessageBusyId] = useState<string | null>(null);
+  const [inboxMenu, setInboxMenu] = useState<InboxMenuState | null>(null);
+  const [markingUnread, setMarkingUnread] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const docInputRef = useRef<HTMLInputElement | null>(null);
+  const inboxMenuRef = useRef<HTMLDivElement | null>(null);
   const selectedStudentIdRef = useRef<string | null>(null);
   const stickToBottomRef = useRef(true);
   const loadingOlderRef = useRef(false);
@@ -838,6 +1025,26 @@ export function AdminChatPage() {
     selectedStudentIdRef.current = selectedStudentId;
   }, [selectedStudentId]);
 
+  useEffect(() => {
+    if (!inboxMenu) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setInboxMenu(null);
+    };
+    const onClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (inboxMenuRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest('[data-inbox-menu-button]')) return;
+      setInboxMenu(null);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('click', onClick);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('click', onClick);
+    };
+  }, [inboxMenu]);
+
   const patchInboxFromThread = (
     thread: {
       id: string;
@@ -847,6 +1054,7 @@ export function AdminChatPage() {
       lastMessageType: ChatMessageType | null;
       lastSenderId: string | null;
       adminUnreadCount: number;
+      adminMarkedUnread: boolean;
     },
   ) => {
     setInbox((current) =>
@@ -860,8 +1068,8 @@ export function AdminChatPage() {
                 lastMessagePreview: thread.lastMessagePreview,
                 lastMessageType: thread.lastMessageType,
                 lastSenderId: thread.lastSenderId,
-                unreadCount:
-                  selectedStudentIdRef.current === thread.studentId ? 0 : thread.adminUnreadCount,
+                unreadCount: thread.adminUnreadCount,
+                markedUnread: thread.adminMarkedUnread,
               }
             : item,
         ),
@@ -880,6 +1088,7 @@ export function AdminChatPage() {
             threadId: message.threadId,
             ...preview,
             unreadCount: asRead ? 0 : item.unreadCount,
+            markedUnread: asRead ? false : item.markedUnread,
           };
         }),
       ),
@@ -939,6 +1148,9 @@ export function AdminChatPage() {
     setMessages([]);
     setThreadId(null);
     setHasMore(false);
+    setEditingMessageId(null);
+    setEditDraft('');
+    setPendingDeleteId(null);
     stickToBottomRef.current = true;
 
     void (async () => {
@@ -952,33 +1164,44 @@ export function AdminChatPage() {
         setHasMore(rows.length >= CHAT_PAGE_SIZE);
         void prefetchChatAttachmentUrls(recentChatAttachmentPaths(rows));
 
-        try {
-          const read = await markChatThreadRead(thread.id);
-          if (mounted) patchInboxFromThread(read);
-        } catch {
-          setInbox((current) =>
-            sortInbox(
-              current.map((item) =>
-                item.studentId === selectedStudentId ? { ...item, unreadCount: 0 } : item,
-              ),
-            ),
-          );
+        const openedRevision = thread.adminReadRevision;
+        const read = await markChatThreadRead(thread.id, openedRevision).catch(() => null);
+        if (read && mounted && selectedStudentIdRef.current === selectedStudentId) {
+          patchInboxFromThread(read);
         }
 
-        unsubscribe = subscribeChatMessages(thread.id, (message) => {
-          stickToBottomRef.current = true;
-          setMessages((current) => {
-            if (current.some((entry) => entry.id === message.id)) return current;
-            return [...current, message];
-          });
-          if (message.attachmentPath) {
-            void prefetchChatAttachmentUrls([message.attachmentPath]);
-          }
-          if (selectedStudentIdRef.current === selectedStudentId) {
-            patchInboxFromMessage(message, selectedStudentId, true);
-            void markChatThreadRead(thread.id).then((read) => patchInboxFromThread(read));
-          }
-        });
+        unsubscribe = subscribeChatMessages(
+          thread.id,
+          (message) => {
+            stickToBottomRef.current = true;
+            setMessages((current) => {
+              if (current.some((entry) => entry.id === message.id)) return current;
+              return [...current, message];
+            });
+            if (message.attachmentPath) {
+              void prefetchChatAttachmentUrls([message.attachmentPath]);
+            }
+            if (selectedStudentIdRef.current === selectedStudentId) {
+              patchInboxFromMessage(message, selectedStudentId, true);
+              void markChatThreadRead(thread.id, openedRevision).then((read) => {
+                if (selectedStudentIdRef.current !== selectedStudentId) return;
+                patchInboxFromThread(read);
+              });
+            }
+          },
+          {
+            onUpdate: (message) => {
+              setMessages((current) =>
+                current.map((entry) => (entry.id === message.id ? message : entry)),
+              );
+            },
+            onDelete: (messageId) => {
+              setMessages((current) => current.filter((entry) => entry.id !== messageId));
+              setEditingMessageId((current) => (current === messageId ? null : current));
+              setPendingDeleteId((current) => (current === messageId ? null : current));
+            },
+          },
+        );
       } catch {
         if (mounted) setError('Sohbet yüklenemedi. SQL migration çalıştırıldı mı?');
       } finally {
@@ -1140,6 +1363,96 @@ export function AdminChatPage() {
     }
   };
 
+  const openInboxMenu = (studentId: string, clientX: number, clientY: number) => {
+    const width = 230;
+    const height = 48;
+    const left = Math.max(8, Math.min(clientX, window.innerWidth - width - 8));
+    const top =
+      clientY + height > window.innerHeight - 8 ? Math.max(8, clientY - height) : clientY;
+    setInboxMenu({ studentId, x: left, y: top });
+  };
+
+  const handleMarkUnread = async (studentId: string, targetThreadId: string) => {
+    if (markingUnread) return;
+    setMarkingUnread(true);
+    setInboxMenu(null);
+    setError('');
+    const previous = inbox.find((item) => item.studentId === studentId);
+    if (selectedStudentIdRef.current === studentId) {
+      selectedStudentIdRef.current = null;
+      setSelectedStudentId(null);
+    }
+    setInbox((current) =>
+      sortInbox(
+        current.map((item) =>
+          item.studentId === studentId ? { ...item, markedUnread: true } : item,
+        ),
+      ),
+    );
+    try {
+      const thread = await markChatThreadUnread(targetThreadId);
+      patchInboxFromThread(thread);
+    } catch {
+      if (previous) {
+        setInbox((current) =>
+          sortInbox(current.map((item) => (item.studentId === studentId ? previous : item))),
+        );
+      }
+      setError('Sohbet okunmadı olarak işaretlenemedi. SQL migration çalıştırıldı mı?');
+    } finally {
+      setMarkingUnread(false);
+    }
+  };
+
+  const startEdit = (message: ChatMessage) => {
+    setPendingDeleteId(null);
+    setEditingMessageId(message.id);
+    setEditDraft(message.body);
+  };
+
+  const handleSaveEdit = async (message: ChatMessage) => {
+    const nextBody = editDraft.trim();
+    if (message.messageType === 'text' && !nextBody) {
+      setError('Mesaj boş bırakılamaz.');
+      return;
+    }
+    if (nextBody === message.body.trim()) {
+      setEditingMessageId(null);
+      return;
+    }
+    setMessageBusyId(message.id);
+    setError('');
+    try {
+      const updated = await updateOwnChatMessage(message.id, nextBody);
+      setMessages((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
+      setEditingMessageId(null);
+    } catch {
+      setError('Mesaj düzenlenemedi. SQL migration çalıştırıldı mı?');
+    } finally {
+      setMessageBusyId(null);
+    }
+  };
+
+  const handleConfirmDelete = async (message: ChatMessage) => {
+    setMessageBusyId(message.id);
+    setError('');
+    try {
+      await deleteOwnChatMessage(message);
+      setMessages((current) => current.filter((entry) => entry.id !== message.id));
+      setPendingDeleteId((current) => (current === message.id ? null : current));
+      setEditingMessageId((current) => (current === message.id ? null : current));
+    } catch {
+      setError('Mesaj silinemedi. SQL migration çalıştırıldı mı?');
+    } finally {
+      setMessageBusyId(null);
+    }
+  };
+
+  const menuItem = inboxMenu
+    ? (inbox.find((row) => row.studentId === inboxMenu.studentId) ?? null)
+    : null;
+  const menuAlreadyUnread = menuItem ? inboxShowsUnread(menuItem) : false;
+
   return (
     <PreviewShell>
       <PreviewTopBar>
@@ -1192,36 +1505,67 @@ export function AdminChatPage() {
               </SearchRow>
               <StudentList>
                 {filteredInbox.map((item) => {
-                  const unread = item.unreadCount > 0;
+                  const unread =
+                    item.studentId !== selectedStudentId && inboxShowsUnread(item);
+                  const badgeCount = inboxBadgeCount(item);
                   const todayPercent = todayPercentByStudent[item.studentId] ?? null;
                   return (
                     <InboxRow
                       key={item.studentId}
-                      type="button"
                       $selected={item.studentId === selectedStudentId}
-                      onClick={() => setSelectedStudentId(item.studentId)}
+                      onContextMenu={(event) => {
+                        event.preventDefault();
+                        openInboxMenu(item.studentId, event.clientX, event.clientY);
+                      }}
                     >
-                      <InboxMain>
-                        <InboxTop>
-                          <InboxNameRow>
-                            <InboxName $unread={unread}>{item.studentName}</InboxName>
-                            <CompactStatusChip $tone={completionTone(todayPercent)}>
-                              {formatCompletionLabel(todayPercent)}
-                            </CompactStatusChip>
-                          </InboxNameRow>
-                          <InboxTime $unread={unread}>{formatInboxTime(item.lastMessageAt)}</InboxTime>
-                        </InboxTop>
-                        <InboxBottom>
-                          <InboxPreview $unread={unread}>
-                            {previewLabel(item, user.id)}
-                          </InboxPreview>
-                          {unread ? (
-                            <UnreadBadge>
-                              {item.unreadCount > 99 ? '99+' : item.unreadCount}
-                            </UnreadBadge>
-                          ) : null}
-                        </InboxBottom>
-                      </InboxMain>
+                      <InboxOpenButton
+                        type="button"
+                        onClick={() => {
+                          setInboxMenu(null);
+                          setSelectedStudentId(item.studentId);
+                        }}
+                      >
+                        <InboxMain>
+                          <InboxTop>
+                            <InboxNameRow>
+                              <InboxName $unread={unread}>{item.studentName}</InboxName>
+                              <CompactStatusChip $tone={completionTone(todayPercent)}>
+                                {formatCompletionLabel(todayPercent)}
+                              </CompactStatusChip>
+                            </InboxNameRow>
+                            <InboxTime $unread={unread}>
+                              {formatInboxTime(item.lastMessageAt)}
+                            </InboxTime>
+                          </InboxTop>
+                          <InboxBottom>
+                            <InboxPreview $unread={unread}>
+                              {previewLabel(item, user.id)}
+                            </InboxPreview>
+                            {unread ? (
+                              <UnreadBadge>
+                                {badgeCount > 99 ? '99+' : badgeCount}
+                              </UnreadBadge>
+                            ) : null}
+                          </InboxBottom>
+                        </InboxMain>
+                      </InboxOpenButton>
+                      <InboxMenuButton
+                        type="button"
+                        data-inbox-menu-button
+                        aria-label={`${item.studentName} sohbet işlemleri`}
+                        aria-expanded={inboxMenu?.studentId === item.studentId}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (inboxMenu?.studentId === item.studentId) {
+                            setInboxMenu(null);
+                            return;
+                          }
+                          const rect = event.currentTarget.getBoundingClientRect();
+                          openInboxMenu(item.studentId, rect.right - 230, rect.bottom + 4);
+                        }}
+                      >
+                        <MoreVertical size={16} strokeWidth={2.4} />
+                      </InboxMenuButton>
                     </InboxRow>
                   );
                 })}
@@ -1247,6 +1591,15 @@ export function AdminChatPage() {
                   {selectedGrade ? (
                     <StatusChip $tone="warn">{studentClassPillLabel(selectedGrade)}</StatusChip>
                   ) : null}
+                  {selectedStudent && threadId ? (
+                    <QuietAction
+                      type="button"
+                      disabled={markingUnread || chatLoading}
+                      onClick={() => void handleMarkUnread(selectedStudent.studentId, threadId)}
+                    >
+                      Okunmadı işaretle
+                    </QuietAction>
+                  ) : null}
                 </ChatPanelTitleRow>
                 {chatLoading ? <LoadingText>Sohbet yükleniyor...</LoadingText> : null}
               </ChatPanelHead>
@@ -1265,6 +1618,10 @@ export function AdminChatPage() {
                 ) : null}
                 {messages.map((message, index) => {
                   const mine = message.senderId === user.id;
+                  const canManage = mine && message.messageType !== 'system';
+                  const editing = editingMessageId === message.id;
+                  const confirmingDelete = pendingDeleteId === message.id;
+                  const busy = messageBusyId === message.id;
                   const prev = messages[index - 1];
                   const showDayDivider =
                     !prev || messageDateKey(prev.createdAt) !== messageDateKey(message.createdAt);
@@ -1275,11 +1632,92 @@ export function AdminChatPage() {
                           <DayDividerLabel>{formatChatDayLabel(message.createdAt)}</DayDividerLabel>
                         </DayDivider>
                       ) : null}
-                      <Bubble $mine={mine}>
-                        <MessageAttachment message={message} />
-                        {message.body ? message.body : null}
-                        <Meta>{formatClock(message.createdAt)}</Meta>
-                      </Bubble>
+                      <BubbleBlock $mine={mine}>
+                        <Bubble $mine={mine}>
+                          <MessageAttachment message={message} />
+                          {editing ? (
+                            <EditArea
+                              value={editDraft}
+                              disabled={busy}
+                              autoFocus
+                              aria-label="Mesajı düzenle"
+                              onChange={(event) => setEditDraft(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Escape') {
+                                  event.preventDefault();
+                                  setEditingMessageId(null);
+                                }
+                                if (event.key === 'Enter' && !event.shiftKey) {
+                                  event.preventDefault();
+                                  void handleSaveEdit(message);
+                                }
+                              }}
+                            />
+                          ) : message.body ? (
+                            message.body
+                          ) : null}
+                          <Meta>
+                            {formatClock(message.createdAt)}
+                            {message.editedAt ? ' · düzenlendi' : ''}
+                          </Meta>
+                          {editing ? (
+                            <BubbleActions>
+                              <BubbleAction
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void handleSaveEdit(message)}
+                              >
+                                Kaydet
+                              </BubbleAction>
+                              <BubbleAction
+                                type="button"
+                                disabled={busy}
+                                onClick={() => setEditingMessageId(null)}
+                              >
+                                Vazgeç
+                              </BubbleAction>
+                            </BubbleActions>
+                          ) : null}
+                        </Bubble>
+                        {canManage && !editing ? (
+                          confirmingDelete ? (
+                            <BubbleActions>
+                              <ConfirmHint>Silinsin mi?</ConfirmHint>
+                              <BubbleActionDanger
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void handleConfirmDelete(message)}
+                              >
+                                Sil
+                              </BubbleActionDanger>
+                              <BubbleAction
+                                type="button"
+                                disabled={busy}
+                                onClick={() => setPendingDeleteId(null)}
+                              >
+                                Vazgeç
+                              </BubbleAction>
+                            </BubbleActions>
+                          ) : (
+                            <BubbleActions>
+                              <BubbleAction
+                                type="button"
+                                disabled={busy}
+                                onClick={() => startEdit(message)}
+                              >
+                                Düzenle
+                              </BubbleAction>
+                              <BubbleActionDanger
+                                type="button"
+                                disabled={busy}
+                                onClick={() => setPendingDeleteId(message.id)}
+                              >
+                                Sil
+                              </BubbleActionDanger>
+                            </BubbleActions>
+                          )
+                        ) : null}
+                      </BubbleBlock>
                     </Fragment>
                   );
                 })}
@@ -1341,6 +1779,28 @@ export function AdminChatPage() {
           </ChatLayout>
         </PreviewFrame>
       </PreviewBody>
+      {inboxMenu && menuItem
+        ? createPortal(
+            <InboxMenu ref={inboxMenuRef} role="menu" style={{ top: inboxMenu.y, left: inboxMenu.x }}>
+              <InboxMenuItem
+                type="button"
+                role="menuitem"
+                disabled={!menuItem.threadId || menuAlreadyUnread || markingUnread}
+                onClick={() => {
+                  if (!menuItem.threadId || menuAlreadyUnread) return;
+                  void handleMarkUnread(menuItem.studentId, menuItem.threadId);
+                }}
+              >
+                {!menuItem.threadId
+                  ? 'Henüz sohbet yok'
+                  : menuAlreadyUnread
+                    ? 'Zaten okunmadı'
+                    : 'Okunmadı olarak işaretle'}
+              </InboxMenuItem>
+            </InboxMenu>,
+            document.body,
+          )
+        : null}
     </PreviewShell>
   );
 }

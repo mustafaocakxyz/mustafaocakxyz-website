@@ -101,6 +101,8 @@ export type ChatThread = {
   lastSenderId: string | null;
   adminLastReadAt: string | null;
   adminUnreadCount: number;
+  adminMarkedUnread: boolean;
+  adminReadRevision: number;
 };
 
 /** Admin chat sidebar row (student + optional thread inbox fields). */
@@ -113,6 +115,8 @@ export type AdminChatInboxItem = {
   lastMessageType: ChatMessageType | null;
   lastSenderId: string | null;
   unreadCount: number;
+  /** True when an admin marked the thread unread without a new student message. */
+  markedUnread: boolean;
 };
 
 export type ChatMessage = {
@@ -123,6 +127,7 @@ export type ChatMessage = {
   messageType: ChatMessageType;
   attachmentPath: string | null;
   createdAt: string;
+  editedAt: string | null;
 };
 
 export type DenemeLeafScore = {

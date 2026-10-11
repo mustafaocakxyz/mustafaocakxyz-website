@@ -1298,6 +1298,8 @@ function mapChatThread(row: DbChatThread): ChatThread {
     lastSenderId: row.last_sender_id ?? null,
     adminLastReadAt: row.admin_last_read_at ?? null,
     adminUnreadCount: row.admin_unread_count ?? 0,
+    adminMarkedUnread: row.admin_marked_unread ?? false,
+    adminReadRevision: Number(row.admin_read_revision ?? 0),
   };
 }
 
@@ -1310,11 +1312,15 @@ function mapChatMessage(row: DbChatMessage): ChatMessage {
     messageType: row.message_type,
     attachmentPath: row.attachment_path,
     createdAt: row.created_at,
+    editedAt: row.edited_at ?? null,
   };
 }
 
 const CHAT_THREAD_SELECT =
-  'id, organization_id, student_id, last_message_at, last_message_preview, last_message_type, last_sender_id, admin_last_read_at, admin_unread_count, created_at, updated_at';
+  'id, organization_id, student_id, last_message_at, last_message_preview, last_message_type, last_sender_id, admin_last_read_at, admin_unread_count, admin_marked_unread, admin_read_revision, created_at, updated_at';
+
+const CHAT_MESSAGE_SELECT =
+  'id, organization_id, thread_id, sender_id, body, message_type, attachment_path, created_at, edited_at';
 
 function sortAdminChatInbox(items: AdminChatInboxItem[]): AdminChatInboxItem[] {
   return [...items].sort((a, b) => {
@@ -1358,6 +1364,7 @@ export async function fetchAdminChatInbox(): Promise<AdminChatInboxItem[]> {
         lastMessageType: thread?.lastMessageType ?? null,
         lastSenderId: thread?.lastSenderId ?? null,
         unreadCount: thread?.adminUnreadCount ?? 0,
+        markedUnread: thread?.adminMarkedUnread ?? false,
       };
     }),
   );
@@ -1367,7 +1374,7 @@ export async function fetchAdminChatInbox(): Promise<AdminChatInboxItem[]> {
 export async function fetchAdminChatUnreadTotal(): Promise<number> {
   const [students, threadsRes] = await Promise.all([
     fetchChatVisibleStudents(),
-    supabase.from('chat_threads').select('student_id, admin_unread_count'),
+    supabase.from('chat_threads').select('student_id, admin_unread_count, admin_marked_unread'),
   ]);
   if (threadsRes.error) throw threadsRes.error;
 
@@ -1375,7 +1382,8 @@ export async function fetchAdminChatUnreadTotal(): Promise<number> {
   return (threadsRes.data ?? []).reduce((count, row) => {
     if (!visibleIds.has(row.student_id as string)) return count;
     const n = typeof row.admin_unread_count === 'number' ? row.admin_unread_count : 0;
-    return n > 0 ? count + 1 : count;
+    const marked = row.admin_marked_unread === true;
+    return n > 0 || marked ? count + 1 : count;
   }, 0);
 }
 
@@ -1387,8 +1395,20 @@ export async function ensureChatThread(studentId: string): Promise<ChatThread> {
   return mapChatThread(data as DbChatThread);
 }
 
-export async function markChatThreadRead(threadId: string): Promise<ChatThread> {
+export async function markChatThreadRead(
+  threadId: string,
+  revision: number,
+): Promise<ChatThread> {
   const { data, error } = await supabase.rpc('mark_chat_thread_read', {
+    p_thread_id: threadId,
+    p_revision: revision,
+  });
+  if (error) throw error;
+  return mapChatThread(data as DbChatThread);
+}
+
+export async function markChatThreadUnread(threadId: string): Promise<ChatThread> {
+  const { data, error } = await supabase.rpc('mark_chat_thread_unread', {
     p_thread_id: threadId,
   });
   if (error) throw error;
@@ -1399,9 +1419,7 @@ export async function fetchChatMessages(
   threadId: string,
   options?: { limit?: number; before?: string },
 ): Promise<ChatMessage[]> {
-  const select =
-    'id, organization_id, thread_id, sender_id, body, message_type, attachment_path, created_at';
-  let query = supabase.from('chat_messages').select(select).eq('thread_id', threadId);
+  let query = supabase.from('chat_messages').select(CHAT_MESSAGE_SELECT).eq('thread_id', threadId);
 
   if (options?.before) {
     query = query.lt('created_at', options.before);
@@ -1449,9 +1467,19 @@ export async function sendChatTextMessage(
       body: trimmed,
       message_type: 'text',
     })
-    .select(
-      'id, organization_id, thread_id, sender_id, body, message_type, attachment_path, created_at',
-    )
+    .select(CHAT_MESSAGE_SELECT)
+    .single();
+
+  if (error) throw error;
+  return mapChatMessage(data as DbChatMessage);
+}
+
+export async function updateOwnChatMessage(messageId: string, body: string): Promise<ChatMessage> {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .update({ body })
+    .eq('id', messageId)
+    .select(CHAT_MESSAGE_SELECT)
     .single();
 
   if (error) throw error;
@@ -1524,9 +1552,7 @@ export async function sendChatAttachmentMessage(input: {
       message_type: input.messageType,
       attachment_path: attachmentPath,
     })
-    .select(
-      'id, organization_id, thread_id, sender_id, body, message_type, attachment_path, created_at',
-    )
+    .select(CHAT_MESSAGE_SELECT)
     .single();
 
   if (error) {
@@ -1537,10 +1563,30 @@ export async function sendChatAttachmentMessage(input: {
   return mapChatMessage(data as DbChatMessage);
 }
 
+export async function deleteOwnChatMessage(message: ChatMessage): Promise<void> {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .delete()
+    .eq('id', message.id)
+    .select('id');
+
+  if (error) throw error;
+  if (!data?.length) throw new Error('Message was not deleted');
+
+  if (message.attachmentPath) {
+    await supabase.storage.from(CHAT_ATTACHMENTS_BUCKET).remove([message.attachmentPath]);
+  }
+}
+
 export function subscribeChatMessages(
   threadId: string,
   onInsert: (message: ChatMessage) => void,
+  extra?: {
+    onUpdate?: (message: ChatMessage) => void;
+    onDelete?: (messageId: string) => void;
+  },
 ): () => void {
+  const filter = `thread_id=eq.${threadId}`;
   const channel = supabase
     .channel(`chat-messages:${threadId}`)
     .on(
@@ -1549,10 +1595,35 @@ export function subscribeChatMessages(
         event: 'INSERT',
         schema: 'public',
         table: 'chat_messages',
-        filter: `thread_id=eq.${threadId}`,
+        filter,
       },
       (payload) => {
         onInsert(mapChatMessage(payload.new as DbChatMessage));
+      },
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'chat_messages',
+        filter,
+      },
+      (payload) => {
+        extra?.onUpdate?.(mapChatMessage(payload.new as DbChatMessage));
+      },
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'chat_messages',
+        filter,
+      },
+      (payload) => {
+        const id = (payload.old as { id?: string } | null)?.id;
+        if (id) extra?.onDelete?.(id);
       },
     )
     .subscribe();

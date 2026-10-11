@@ -485,16 +485,29 @@ export function StudentChatPage() {
         setMessages(rows);
         setHasMore(rows.length >= CHAT_PAGE_SIZE);
         void prefetchChatAttachmentUrls(recentChatAttachmentPaths(rows));
-        unsubscribe = subscribeChatMessages(thread.id, (message) => {
-          stickToBottomRef.current = true;
-          setMessages((current) => {
-            if (current.some((entry) => entry.id === message.id)) return current;
-            return [...current, message];
-          });
-          if (message.attachmentPath) {
-            void prefetchChatAttachmentUrls([message.attachmentPath]);
-          }
-        });
+        unsubscribe = subscribeChatMessages(
+          thread.id,
+          (message) => {
+            stickToBottomRef.current = true;
+            setMessages((current) => {
+              if (current.some((entry) => entry.id === message.id)) return current;
+              return [...current, message];
+            });
+            if (message.attachmentPath) {
+              void prefetchChatAttachmentUrls([message.attachmentPath]);
+            }
+          },
+          {
+            onUpdate: (message) => {
+              setMessages((current) =>
+                current.map((entry) => (entry.id === message.id ? message : entry)),
+              );
+            },
+            onDelete: (messageId) => {
+              setMessages((current) => current.filter((entry) => entry.id !== messageId));
+            },
+          },
+        );
       } catch {
         if (mounted) setError('Sohbet yüklenemedi.');
       } finally {
@@ -684,7 +697,10 @@ export function StudentChatPage() {
                   <Bubble key={message.id} $mine={mine}>
                     <MessageAttachment message={message} />
                     {message.body ? message.body : null}
-                    <Meta>{formatClock(message.createdAt)}</Meta>
+                    <Meta>
+                      {formatClock(message.createdAt)}
+                      {message.editedAt ? ' · düzenlendi' : ''}
+                    </Meta>
                   </Bubble>
                 );
               })}
