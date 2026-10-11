@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowDownWideNarrow, MoreVertical } from 'lucide-react';
+import { ArrowDownWideNarrow, Check, MoreVertical, Pencil, Trash2, X } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
@@ -401,14 +401,14 @@ const ComposerWrap = styled.div`
 const BubbleBlock = styled.div<{ $mine: boolean }>`
   align-self: ${({ $mine }) => ($mine ? 'flex-end' : 'flex-start')};
   display: flex;
-  flex-direction: column;
-  align-items: ${({ $mine }) => ($mine ? 'flex-end' : 'flex-start')};
-  max-width: min(80%, 480px);
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  max-width: min(88%, 540px);
 `;
 
 const Bubble = styled.div<{ $mine: boolean }>`
-  max-width: 100%;
+  max-width: min(80%, 480px);
   padding: 10px 14px;
   border-radius: ${t.radiusMd};
   border: 1px solid
@@ -421,43 +421,35 @@ const Bubble = styled.div<{ $mine: boolean }>`
   word-break: break-word;
 `;
 
-const ConfirmHint = styled.span`
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: ${t.muted};
-`;
-
 const BubbleActions = styled.div`
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  padding: 0 4px;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
 `;
 
-const BubbleAction = styled.button`
+const BubbleIconButton = styled.button<{ $danger?: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border: 0;
+  border-radius: 8px;
+  border: 1px solid transparent;
   background: transparent;
-  color: ${t.mutedSoft};
-  font-family: inherit;
-  font-size: 0.72rem;
-  font-weight: 800;
+  color: ${({ $danger }) => ($danger ? t.danger : t.mutedSoft)};
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    color: ${t.text};
+    border-color: ${t.border};
+    background: rgba(15, 23, 42, 0.45);
+    color: ${({ $danger }) => ($danger ? t.danger : t.text)};
   }
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-  }
-`;
-
-const BubbleActionDanger = styled(BubbleAction)`
-  &:hover:not(:disabled) {
-    color: ${t.danger};
   }
 `;
 
@@ -1633,6 +1625,76 @@ export function AdminChatPage() {
                         </DayDivider>
                       ) : null}
                       <BubbleBlock $mine={mine}>
+                        {canManage ? (
+                          <BubbleActions>
+                            {editing ? (
+                              <>
+                                <BubbleIconButton
+                                  type="button"
+                                  disabled={busy}
+                                  aria-label="Kaydet"
+                                  title="Kaydet"
+                                  onClick={() => void handleSaveEdit(message)}
+                                >
+                                  <Check size={15} strokeWidth={2.4} />
+                                </BubbleIconButton>
+                                <BubbleIconButton
+                                  type="button"
+                                  disabled={busy}
+                                  aria-label="Vazgeç"
+                                  title="Vazgeç"
+                                  onClick={() => setEditingMessageId(null)}
+                                >
+                                  <X size={15} strokeWidth={2.4} />
+                                </BubbleIconButton>
+                              </>
+                            ) : confirmingDelete ? (
+                              <>
+                                <BubbleIconButton
+                                  type="button"
+                                  $danger
+                                  disabled={busy}
+                                  aria-label="Silmeyi onayla"
+                                  title="Silmeyi onayla"
+                                  onClick={() => void handleConfirmDelete(message)}
+                                >
+                                  <Trash2 size={15} strokeWidth={2.4} />
+                                </BubbleIconButton>
+                                <BubbleIconButton
+                                  type="button"
+                                  disabled={busy}
+                                  aria-label="Vazgeç"
+                                  title="Vazgeç"
+                                  onClick={() => setPendingDeleteId(null)}
+                                >
+                                  <X size={15} strokeWidth={2.4} />
+                                </BubbleIconButton>
+                              </>
+                            ) : (
+                              <>
+                                <BubbleIconButton
+                                  type="button"
+                                  disabled={busy}
+                                  aria-label="Düzenle"
+                                  title="Düzenle"
+                                  onClick={() => startEdit(message)}
+                                >
+                                  <Pencil size={15} strokeWidth={2.4} />
+                                </BubbleIconButton>
+                                <BubbleIconButton
+                                  type="button"
+                                  $danger
+                                  disabled={busy}
+                                  aria-label="Sil"
+                                  title="Sil"
+                                  onClick={() => setPendingDeleteId(message.id)}
+                                >
+                                  <Trash2 size={15} strokeWidth={2.4} />
+                                </BubbleIconButton>
+                              </>
+                            )}
+                          </BubbleActions>
+                        ) : null}
                         <Bubble $mine={mine}>
                           <MessageAttachment message={message} />
                           {editing ? (
@@ -1660,63 +1722,7 @@ export function AdminChatPage() {
                             {formatClock(message.createdAt)}
                             {message.editedAt ? ' · düzenlendi' : ''}
                           </Meta>
-                          {editing ? (
-                            <BubbleActions>
-                              <BubbleAction
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void handleSaveEdit(message)}
-                              >
-                                Kaydet
-                              </BubbleAction>
-                              <BubbleAction
-                                type="button"
-                                disabled={busy}
-                                onClick={() => setEditingMessageId(null)}
-                              >
-                                Vazgeç
-                              </BubbleAction>
-                            </BubbleActions>
-                          ) : null}
                         </Bubble>
-                        {canManage && !editing ? (
-                          confirmingDelete ? (
-                            <BubbleActions>
-                              <ConfirmHint>Silinsin mi?</ConfirmHint>
-                              <BubbleActionDanger
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void handleConfirmDelete(message)}
-                              >
-                                Sil
-                              </BubbleActionDanger>
-                              <BubbleAction
-                                type="button"
-                                disabled={busy}
-                                onClick={() => setPendingDeleteId(null)}
-                              >
-                                Vazgeç
-                              </BubbleAction>
-                            </BubbleActions>
-                          ) : (
-                            <BubbleActions>
-                              <BubbleAction
-                                type="button"
-                                disabled={busy}
-                                onClick={() => startEdit(message)}
-                              >
-                                Düzenle
-                              </BubbleAction>
-                              <BubbleActionDanger
-                                type="button"
-                                disabled={busy}
-                                onClick={() => setPendingDeleteId(message.id)}
-                              >
-                                Sil
-                              </BubbleActionDanger>
-                            </BubbleActions>
-                          )
-                        ) : null}
                       </BubbleBlock>
                     </Fragment>
                   );
