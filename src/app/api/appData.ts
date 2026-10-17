@@ -388,6 +388,34 @@ export async function updateStudentEarningsContribution(
   return mapStudentAdminSettings(data as Parameters<typeof mapStudentAdminSettings>[0]);
 }
 
+export async function fetchStudentTeaMeetNeeded(): Promise<Record<string, boolean>> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, tea_meet_needed')
+    .eq('role', 'student')
+    .eq('is_active', true);
+
+  if (error) throw error;
+
+  const flags: Record<string, boolean> = {};
+  for (const row of data ?? []) {
+    flags[row.id as string] = row.tea_meet_needed === true;
+  }
+  return flags;
+}
+
+export async function updateStudentTeaMeetNeeded(
+  studentId: string,
+  needed: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ tea_meet_needed: needed })
+    .eq('id', studentId)
+    .eq('role', 'student');
+  if (error) throw error;
+}
+
 export async function fetchPendingPasswordResetRequests(): Promise<PasswordResetRequest[]> {
   const { data, error } = await supabase
     .from('password_reset_requests')

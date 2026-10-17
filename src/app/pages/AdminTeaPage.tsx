@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, EyeOff, Table2, X } from 'lucide-react';
+import { Camera, Check, EyeOff, Table2, X } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { fetchOrgTasksForRange, fetchStudentCoachGrades, fetchStudents, subscribeDailyTasks } from '../api/appData';
+import {
+  fetchOrgTasksForRange,
+  fetchStudentCoachGrades,
+  fetchStudentTeaMeetNeeded,
+  fetchStudents,
+  subscribeDailyTasks,
+  updateStudentTeaMeetNeeded,
+} from '../api/appData';
 import { useAppAuth } from '../AppAuthContext';
 import type { NumericStudentGrade, StudentGrade, StudentSummary } from '../types';
 import { isNumericStudentGrade } from '../types';
@@ -121,6 +128,37 @@ const HideButton = styled.button`
     color: ${t.text};
     border-color: rgba(96, 165, 250, 0.5);
   }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+`;
+
+const MeetToggleButton = styled(HideButton)<{ $on?: boolean }>`
+  color: ${({ $on }) => ($on ? 'rgba(255, 237, 213, 0.98)' : t.muted)};
+  border-color: ${({ $on }) => ($on ? 'rgba(251, 146, 60, 0.55)' : t.borderStrong)};
+  background: ${({ $on }) => ($on ? 'rgba(249, 115, 22, 0.22)' : t.panel)};
+
+  &:hover {
+    color: ${({ $on }) => ($on ? 'rgba(255, 247, 237, 1)' : t.text)};
+    border-color: ${({ $on }) => ($on ? 'rgba(251, 146, 60, 0.75)' : 'rgba(96, 165, 250, 0.5)')};
+  }
+`;
+
+const MeetNeededPill = styled.span`
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 146, 60, 0.5);
+  background: rgba(249, 115, 22, 0.2);
+  color: rgba(255, 237, 213, 0.98);
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
 `;
 
 const StudentName = styled.span`
@@ -200,6 +238,8 @@ export function AdminTeaPage() {
   const { user, isLoading } = useAppAuth();
   const [students, setStudents] = useState<StudentSummary[]>([]);
   const [gradesByStudent, setGradesByStudent] = useState<Record<string, NumericStudentGrade>>({});
+  const [meetNeededByStudent, setMeetNeededByStudent] = useState<Record<string, boolean>>({});
+  const [meetBusyIds, setMeetBusyIds] = useState<Set<string>>(() => new Set());
   const [taskPresence, setTaskPresence] = useState<Record<string, Record<string, boolean>>>({});
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
   const [pageLoading, setPageLoading] = useState(true);
@@ -250,10 +290,11 @@ export function AdminTeaPage() {
           return;
         }
 
-        const [studentRows, orgTasks, grades] = await Promise.all([
+        const [studentRows, orgTasks, grades, meetFlags] = await Promise.all([
           fetchStudents(),
           fetchOrgTasksForRange(fromDate, toDate),
           fetchStudentCoachGrades().catch((): Record<string, StudentGrade | null> => ({})),
+          fetchStudentTeaMeetNeeded().catch((): Record<string, boolean> => ({})),
         ]);
 
         if (cancelled) return;
@@ -266,6 +307,7 @@ export function AdminTeaPage() {
 
         setStudents(studentRows);
         setGradesByStudent(numericGrades);
+        setMeetNeededByStudent(meetFlags);
         setTaskPresence(presenceFromTasks(studentRows, orgTasks));
       } catch {
         if (!cancelled && !silent) setError('Görev analizi yüklenemedi.');
@@ -353,6 +395,30 @@ export function AdminTeaPage() {
     });
   };
 
+  const toggleMeetNeeded = async (studentId: string) => {
+    if (meetBusyIds.has(studentId)) return;
+    const nextValue = !meetNeededByStudent[studentId];
+    setMeetBusyIds((prev) => {
+      const next = new Set(prev);
+      next.add(studentId);
+      return next;
+    });
+    setMeetNeededByStudent((prev) => ({ ...prev, [studentId]: nextValue }));
+    try {
+      await updateStudentTeaMeetNeeded(studentId, nextValue);
+      setError('');
+    } catch {
+      setMeetNeededByStudent((prev) => ({ ...prev, [studentId]: !nextValue }));
+      setError('Meet işareti kaydedilemedi.');
+    } finally {
+      setMeetBusyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(studentId);
+        return next;
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <PreviewShell>
@@ -415,6 +481,8 @@ export function AdminTeaPage() {
                   <tbody>
                     {visibleRows.map(({ student, hasTaskByDate }) => {
                       const grade = gradesByStudent[student.id];
+                      const meetNeeded = Boolean(meetNeededByStudent[student.id]);
+                      const meetBusy = meetBusyIds.has(student.id);
                       return (
                       <tr key={student.id}>
                         <Td>
@@ -427,7 +495,23 @@ export function AdminTeaPage() {
                             >
                               <EyeOff size={11} strokeWidth={2.4} />
                             </HideButton>
+                            <MeetToggleButton
+                              type="button"
+                              $on={meetNeeded}
+                              disabled={meetBusy}
+                              title={meetNeeded ? 'Meet lazım işaretini kaldır' : 'Meet lazım işaretle'}
+                              aria-label={
+                                meetNeeded
+                                  ? `${student.name}: meet lazım işaretini kaldır`
+                                  : `${student.name}: meet lazım işaretle`
+                              }
+                              aria-pressed={meetNeeded}
+                              onClick={() => void toggleMeetNeeded(student.id)}
+                            >
+                              <Camera size={11} strokeWidth={2.4} />
+                            </MeetToggleButton>
                             <StudentName title={student.name}>{student.name}</StudentName>
+                            {meetNeeded ? <MeetNeededPill>meet lazım</MeetNeededPill> : null}
                             {grade ? (
                               <GradeDot title={`${grade}. Sınıf`} aria-label={`${grade}. Sınıf`}>
                                 {grade}

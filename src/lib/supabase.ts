@@ -20,6 +20,7 @@ export type DbProfile = {
   show_on_admin_dashboard?: boolean;
   show_on_ogrenciler?: boolean;
   show_in_admin_chat?: boolean;
+  tea_meet_needed?: boolean;
   count_in_earnings?: boolean;
   earnings_contribution?: number;
   day_count_active?: boolean;
