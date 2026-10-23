@@ -125,6 +125,32 @@ const SortToggleButton = styled.button<{ $active: boolean }>`
   }
 `;
 
+const UnreadFilterButton = styled.button<{ $active: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid
+    ${({ $active }) => ($active ? 'rgba(96, 165, 250, 0.55)' : t.border)};
+  background: ${({ $active }) => ($active ? 'rgba(59, 130, 246, 0.14)' : t.panel2)};
+  color: ${({ $active }) => ($active ? 'rgba(191, 219, 254, 0.98)' : t.muted)};
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: ${({ $active }) =>
+    $active ? '0 0 0 1px rgba(96, 165, 250, 0.2), 0 0 12px rgba(59, 130, 246, 0.18)' : 'none'};
+
+  &:hover {
+    border-color: rgba(96, 165, 250, 0.45);
+    color: ${t.text};
+  }
+`;
+
 const StudentList = styled.div`
   flex: 1;
   min-height: 0;
@@ -970,6 +996,7 @@ export function AdminChatPage() {
   const { user, isLoading } = useAppAuth();
   const [inbox, setInbox] = useState<AdminChatInboxItem[]>([]);
   const [studentQuery, setStudentQuery] = useState('');
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [sortByCompletion, setSortByCompletion] = useState(false);
   const [todayPercentByStudent, setTodayPercentByStudent] = useState<Record<string, number | null>>(
     {},
@@ -1004,14 +1031,17 @@ export function AdminChatPage() {
 
   const filteredInbox = useMemo(() => {
     const q = studentQuery.trim().toLocaleLowerCase('tr');
-    const items = q
+    let items = q
       ? inbox.filter((item) => item.studentName.toLocaleLowerCase('tr').includes(q))
       : inbox;
+    if (unreadOnly) {
+      items = items.filter((item) => inboxShowsUnread(item));
+    }
     if (sortByCompletion) {
       return sortInboxByCompletion(items, todayPercentByStudent);
     }
     return items;
-  }, [inbox, studentQuery, sortByCompletion, todayPercentByStudent]);
+  }, [inbox, studentQuery, unreadOnly, sortByCompletion, todayPercentByStudent]);
 
   useEffect(() => {
     selectedStudentIdRef.current = selectedStudentId;
@@ -1494,6 +1524,16 @@ export function AdminChatPage() {
                 >
                   <ArrowDownWideNarrow size={16} strokeWidth={2.4} />
                 </SortToggleButton>
+                <UnreadFilterButton
+                  type="button"
+                  $active={unreadOnly}
+                  title={unreadOnly ? 'Tüm sohbetleri göster' : 'Yalnızca okunmamış sohbetler'}
+                  aria-label={unreadOnly ? 'Okunmamış filtresini kapat' : 'Okunmamış sohbetleri göster'}
+                  aria-pressed={unreadOnly}
+                  onClick={() => setUnreadOnly((current) => !current)}
+                >
+                  Okunmamış
+                </UnreadFilterButton>
               </SearchRow>
               <StudentList>
                 {filteredInbox.map((item) => {
@@ -1563,7 +1603,11 @@ export function AdminChatPage() {
                 })}
                 {!pageLoading && filteredInbox.length === 0 ? (
                   <EmptyListHint>
-                    {studentQuery.trim() ? 'Eşleşen öğrenci yok.' : 'Öğrenci yok.'}
+                    {studentQuery.trim()
+                      ? 'Eşleşen öğrenci yok.'
+                      : unreadOnly
+                        ? 'Okunmamış sohbet yok.'
+                        : 'Öğrenci yok.'}
                   </EmptyListHint>
                 ) : null}
               </StudentList>
