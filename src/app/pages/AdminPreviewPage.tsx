@@ -121,7 +121,6 @@ import {
   ChatGlowButton,
   ChatUnreadBadge,
   TopBarActions,
-  TopBarButton,
   TopBarIconButton,
   TopBarEnd,
   TopBarTitle,
