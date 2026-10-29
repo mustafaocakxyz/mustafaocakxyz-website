@@ -1321,9 +1321,6 @@ export function AdminPreviewPage() {
       <PreviewTopBar>
         <TopBarLead>
           <TopBarTitle>Admin Paneli</TopBarTitle>
-          <TopBarButton as={Link} to="/app/admin/assistant-results">
-            Asistan sonuçları
-          </TopBarButton>
         </TopBarLead>
         <TopBarActions>
           <ChatGlowButton as={Link} to="/app/admin/chat" $active={chatUnreadTotal > 0}>

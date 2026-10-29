@@ -1,6 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppAuthProvider } from './AppAuthContext';
-import { AdminAssistantResultsPage } from './pages/AdminAssistantResultsPage';
 import { AdminChatPage } from './pages/AdminChatPage';
 import { AdminLibraryPage } from './pages/AdminLibraryPage';
 import { AdminPreviewPage } from './pages/AdminPreviewPage';
@@ -25,7 +24,6 @@ export function AppRoutes() {
         <Route path="student/denemeler" element={<StudentDenemesPage />} />
         <Route path="student/konu" element={<StudentKonuPage />} />
         <Route path="admin" element={<AdminPreviewPage />} />
-        <Route path="admin/assistant-results" element={<AdminAssistantResultsPage />} />
         <Route path="admin/preview" element={<Navigate to="/app/admin" replace />} />
         <Route path="admin/settings" element={<AdminSettingsPage />} />
         <Route path="admin/tea" element={<AdminTeaPage />} />
