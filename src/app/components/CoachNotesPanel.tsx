@@ -3,6 +3,7 @@ import { Check, Pencil, Plus, Trash2 } from 'lucide-react';
 import styled, { keyframes } from 'styled-components';
 import {
   DENEME_TYPES,
+  computeDenemeNet,
   formatDenemeNet,
   lastThreeDenemeAverage,
   type DenemeTypeId,
@@ -283,6 +284,143 @@ const AverageTable = styled.div`
   gap: 6px;
 `;
 
+const ChartSvg = styled.svg`
+  display: block;
+  width: 100%;
+  height: 148px;
+`;
+
+type NetPoint = {
+  id: string;
+  date: string;
+  at: string;
+  net: number;
+};
+
+function dateToMs(dateKey: string): number {
+  return new Date(`${dateKey}T12:00:00`).getTime();
+}
+
+function pointTime(point: NetPoint): number {
+  const base = dateToMs(point.date);
+  const created = Date.parse(point.at);
+  if (!Number.isFinite(created)) return base;
+  return base + (created % 86_400_000);
+}
+
+function formatChartDate(dateKey: string): string {
+  return new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(
+    new Date(`${dateKey}T12:00:00`),
+  );
+}
+
+function catmullRomPath(points: Array<{ x: number; y: number }>): string {
+  if (points.length === 0) return '';
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+  }
+  return d;
+}
+
+function DenemeNetChart({
+  points,
+  stroke,
+  fill,
+}: {
+  points: NetPoint[];
+  stroke: string;
+  fill: string;
+}) {
+  const width = 320;
+  const height = 148;
+  const pad = { top: 12, right: 12, bottom: 26, left: 36 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const xs = points.map(pointTime);
+  const ys = points.map((point) => point.net);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const yPad = minY === maxY ? 1 : (maxY - minY) * 0.12;
+  const y0 = minY - yPad;
+  const y1 = maxY + yPad;
+  const sameX = maxX === minX;
+  const xSpan = sameX ? 1 : maxX - minX;
+  const mapped = points.map((point, index) => {
+    const x =
+      pad.left +
+      (sameX && points.length > 1
+        ? (index / (points.length - 1)) * plotW
+        : ((pointTime(point) - minX) / xSpan) * plotW);
+    const y = pad.top + ((y1 - point.net) / (y1 - y0)) * plotH;
+    return { ...point, x, y };
+  });
+  const ticksY = [y1, (y0 + y1) / 2, y0];
+  const ticksX =
+    points.length === 1 || points[0].date === points[points.length - 1].date
+      ? [points[0].date]
+      : [points[0].date, points[points.length - 1].date];
+
+  return (
+    <ChartSvg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Net / tarih grafiği">
+      {ticksY.map((value, index) => {
+        const y = pad.top + ((y1 - value) / (y1 - y0)) * plotH;
+        return (
+          <g key={`y-${index}`}>
+            <line
+              x1={pad.left}
+              x2={width - pad.right}
+              y1={y}
+              y2={y}
+              stroke="currentColor"
+              strokeOpacity="0.18"
+            />
+            <text x={pad.left - 6} y={y + 3.5} textAnchor="end" fontSize="8" fill="currentColor">
+              {formatDenemeNet(value)}
+            </text>
+          </g>
+        );
+      })}
+      {ticksX.map((dateKey, index) => {
+        const x =
+          mapped.find((point) => point.date === dateKey)?.x ??
+          pad.left + (index === 0 ? 0 : plotW);
+        return (
+          <text
+            key={`x-${dateKey}-${index}`}
+            x={x}
+            y={height - 8}
+            textAnchor={index === 0 ? 'start' : 'end'}
+            fontSize="8"
+            fill="currentColor"
+          >
+            {formatChartDate(dateKey)}
+          </text>
+        );
+      })}
+      {mapped.length > 1 ? (
+        <path d={catmullRomPath(mapped)} fill="none" stroke={stroke} strokeWidth="2.2" />
+      ) : null}
+      {mapped.map((point) => (
+        <circle key={point.id} cx={point.x} cy={point.y} r="3.4" fill={fill} stroke={stroke} strokeWidth="1.2">
+          <title>{`${formatChartDate(point.date)} · ${formatDenemeNet(point.net)}`}</title>
+        </circle>
+      ))}
+    </ChartSvg>
+  );
+}
+
 const AVERAGE_TONES: Record<
   DenemeTypeId,
   { bg: string; border: string; text: string }
@@ -334,17 +472,37 @@ const AVERAGE_TONES: Record<
   },
 };
 
-const AverageRow = styled.div<{ $bg: string; $border: string; $text: string }>`
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 14px;
+const AverageCard = styled.div<{ $bg: string; $border: string; $text: string }>`
   border-radius: ${t.radiusSm};
   border: 1px solid ${({ $border }) => $border};
   background: ${({ $bg }) => $bg};
   color: ${({ $text }) => $text};
+  overflow: hidden;
+`;
+
+const AverageHead = styled.button`
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid rgba(251, 191, 36, 0.55);
+    outline-offset: -2px;
+  }
+`;
+
+const ChartWrap = styled.div`
+  padding: 0 8px 10px;
 `;
 
 function formatStepLine(step: FinishedStudyStep): string {
@@ -362,6 +520,7 @@ export function CoachNotesPanel({ notes, denemes, onSave }: CoachNotesPanelProps
   const [dateDraft, setDateDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [expandedTypeIds, setExpandedTypeIds] = useState<Set<DenemeTypeId>>(() => new Set());
 
   useEffect(() => {
     setEditing(null);
@@ -373,17 +532,45 @@ export function CoachNotesPanel({ notes, denemes, onSave }: CoachNotesPanelProps
     setError('');
   }, [notes.studentId, notes.updatedAt, notes.grade, notes.coachNotes, notes.currentStep]);
 
+  useEffect(() => {
+    setExpandedTypeIds(new Set());
+  }, [notes.studentId]);
+
   const averages = useMemo(
     () =>
       DENEME_TYPES.flatMap((type) => {
-        const count = denemes.filter((entry) => entry.typeId === type.id).length;
-        if (count < 3) return [];
-        const result = lastThreeDenemeAverage(denemes, type.id);
+        const ofType = denemes.filter(
+          (entry) =>
+            entry.typeId === type.id &&
+            (!notes.studentId || entry.studentId === notes.studentId),
+        );
+        if (ofType.length < 3) return [];
+        const result = lastThreeDenemeAverage(ofType, type.id);
         if (!result) return [];
-        return [{ typeId: type.id, label: type.label, result }];
+        const series = [...ofType]
+          .sort((a, b) => {
+            if (a.denemeDate !== b.denemeDate) return a.denemeDate < b.denemeDate ? -1 : 1;
+            return a.createdAt < b.createdAt ? -1 : 1;
+          })
+          .map((entry) => ({
+            id: entry.id,
+            date: entry.denemeDate,
+            at: entry.createdAt,
+            net: computeDenemeNet(entry.typeId, entry.scores),
+          }));
+        return [{ typeId: type.id, label: type.label, result, series }];
       }),
-    [denemes],
+    [denemes, notes.studentId],
   );
+
+  const toggleAverage = (typeId: DenemeTypeId) => {
+    setExpandedTypeIds((current) => {
+      const next = new Set(current);
+      if (next.has(typeId)) next.delete(typeId);
+      else next.add(typeId);
+      return next;
+    });
+  };
 
   const persist = async (
     next: Pick<StudentCoachNotes, 'grade' | 'coachNotes' | 'currentStep' | 'finishedSteps'>,
@@ -697,16 +884,32 @@ export function CoachNotesPanel({ notes, denemes, onSave }: CoachNotesPanelProps
           <AverageTable>
             {averages.map((row) => {
               const tone = AVERAGE_TONES[row.typeId];
+              const expanded = expandedTypeIds.has(row.typeId);
               return (
-                <AverageRow
+                <AverageCard
                   key={row.typeId}
                   $bg={tone.bg}
                   $border={tone.border}
                   $text={tone.text}
                 >
-                  <span>{row.label}</span>
-                  <strong>{formatDenemeNet(row.result.average)}</strong>
-                </AverageRow>
+                  <AverageHead
+                    type="button"
+                    aria-expanded={expanded}
+                    onClick={() => toggleAverage(row.typeId)}
+                  >
+                    <span>{row.label}</span>
+                    <strong>{formatDenemeNet(row.result.average)}</strong>
+                  </AverageHead>
+                  {expanded ? (
+                    <ChartWrap>
+                      <DenemeNetChart
+                        points={row.series}
+                        stroke={tone.border}
+                        fill={tone.text}
+                      />
+                    </ChartWrap>
+                  ) : null}
+                </AverageCard>
               );
             })}
           </AverageTable>
