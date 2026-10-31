@@ -1,35 +1,11 @@
-import { useEffect, useState } from 'react';
 import { GradientTitle } from '../components/GradientTitle';
 import { HomeCard } from '../components/HomeCard';
 import { HomeStudentTeaser } from '../components/HomeStudentTeaser';
 import { CardStack, HomeLayout } from '../components/PageLayout';
-import { fetchPublicActiveStudentCount } from '../lib/fetchPublicStudentCount';
+import { useGelisimCapacity } from '../lib/gelisimCapacity';
 
 export function HomePage() {
-  const [studentCount, setStudentCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadCount = async () => {
-      try {
-        const count = await fetchPublicActiveStudentCount();
-        if (isMounted) setStudentCount(count);
-      } catch {
-        if (isMounted) setStudentCount(0);
-      }
-    };
-
-    void loadCount();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const capacityPill =
-    studentCount === null
-      ? 'KONTENJAN DOLUYOR … / 40'
-      : `KONTENJAN DOLUYOR ${studentCount} / 40`;
+  const { studentCount, isFull, pillLabel } = useGelisimCapacity();
 
   return (
     <HomeLayout>
@@ -40,7 +16,8 @@ export function HomePage() {
           title="YKS & Maarif Koçluk"
           price="6900₺ / ay"
           description="Sürecini Mustafa Ocak ile birlikte götürmek isteyenler için."
-          capacityPill={capacityPill}
+          capacityPill={pillLabel}
+          capacityFull={isFull}
           theme="blue"
           delay="0.6s"
         />

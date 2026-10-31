@@ -158,6 +158,29 @@ export const PaymentActionRouterLink = styled(Link)<{ $theme?: PaymentTheme }>`
   ${actionButtonStyles}
 `;
 
+export const DisabledActionButton = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 22px;
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.45);
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: not-allowed;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+
+  @media (max-width: 600px) {
+    width: 100%;
+  }
+`;
+
 export const InfoBlock = styled.div`
   display: flex;
   flex-direction: column;

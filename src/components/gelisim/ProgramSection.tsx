@@ -14,9 +14,13 @@ const SectionCtaWrap = styled.div`
 
 type ProgramSectionProps = {
   section: ProgramSectionConfig;
+  applicationsOpen?: boolean;
 };
 
-export function ProgramSection({ section }: ProgramSectionProps) {
+export function ProgramSection({
+  section,
+  applicationsOpen = true,
+}: ProgramSectionProps) {
   return (
     <LandingSection>
       <SectionTitle>{section.title}</SectionTitle>
@@ -29,8 +33,13 @@ export function ProgramSection({ section }: ProgramSectionProps) {
       )}
       {section.ctaAfter && (
         <SectionCtaWrap>
-          <CTAButton theme="blue" to={section.ctaAfter.to} immediate>
-            {section.ctaAfter.label}
+          <CTAButton
+            theme="blue"
+            to={applicationsOpen ? section.ctaAfter.to : undefined}
+            disabled={!applicationsOpen}
+            immediate
+          >
+            {applicationsOpen ? section.ctaAfter.label : 'Kontenjan Dolu'}
           </CTAButton>
         </SectionCtaWrap>
       )}

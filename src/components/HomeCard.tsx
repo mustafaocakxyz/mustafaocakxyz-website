@@ -146,16 +146,20 @@ const CardCta = styled(Link)<{ $theme: ThemeColor }>`
   }
 `;
 
-const CapacityPill = styled.span`
+const CapacityPill = styled.span<{ $full?: boolean }>`
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   padding: 9px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(251, 146, 60, 0.5);
-  background: rgba(234, 88, 12, 0.18);
-  color: rgba(254, 215, 170, 0.98);
+  border: 1px solid
+    ${({ $full }) =>
+      $full ? 'rgba(248, 113, 113, 0.55)' : 'rgba(251, 146, 60, 0.5)'};
+  background: ${({ $full }) =>
+    $full ? 'rgba(220, 38, 38, 0.22)' : 'rgba(234, 88, 12, 0.18)'};
+  color: ${({ $full }) =>
+    $full ? 'rgba(254, 202, 202, 0.98)' : 'rgba(254, 215, 170, 0.98)'};
   font-size: 0.92rem;
   font-weight: 800;
   font-family: inherit;
@@ -178,21 +182,26 @@ const CapacityDotWrap = styled.span`
   justify-content: center;
 `;
 
-const CapacityDotCore = styled.span`
+const CapacityDotCore = styled.span<{ $full?: boolean }>`
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #f97316;
-  box-shadow: 0 0 10px rgba(249, 115, 22, 0.75);
+  background: ${({ $full }) => ($full ? '#ef4444' : '#f97316')};
+  box-shadow: ${({ $full }) =>
+    $full
+      ? '0 0 10px rgba(239, 68, 68, 0.75)'
+      : '0 0 10px rgba(249, 115, 22, 0.75)'};
   z-index: 1;
 `;
 
-const CapacityDotPulse = styled.span`
+const CapacityDotPulse = styled.span<{ $full?: boolean }>`
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(251, 146, 60, 0.5);
-  animation: capacityPillBreath 1.8s ease-in-out infinite;
+  background: ${({ $full }) =>
+    $full ? 'rgba(248, 113, 113, 0.45)' : 'rgba(251, 146, 60, 0.5)'};
+  animation: ${({ $full }) =>
+    $full ? 'none' : 'capacityPillBreath 1.8s ease-in-out infinite'};
 
   @keyframes capacityPillBreath {
     0%,
@@ -214,6 +223,7 @@ type HomeCardProps = {
   description: string;
   ctaLabel?: string;
   capacityPill?: string;
+  capacityFull?: boolean;
   theme: ThemeColor;
   delay?: string;
 };
@@ -225,6 +235,7 @@ export function HomeCard({
   description,
   ctaLabel = 'Detayları Gör',
   capacityPill,
+  capacityFull = false,
   theme,
   delay = '0.6s',
 }: HomeCardProps) {
@@ -238,10 +249,10 @@ export function HomeCard({
           {ctaLabel}
         </CardCta>
         {capacityPill ? (
-          <CapacityPill>
+          <CapacityPill $full={capacityFull}>
             <CapacityDotWrap aria-hidden>
-              <CapacityDotPulse />
-              <CapacityDotCore />
+              <CapacityDotPulse $full={capacityFull} />
+              <CapacityDotCore $full={capacityFull} />
             </CapacityDotWrap>
             {capacityPill}
           </CapacityPill>

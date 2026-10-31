@@ -112,15 +112,49 @@ const OrangeButtonLink = styled(Link)<{ $immediate?: boolean }>`
   }
 `;
 
+const DisabledButton = styled.span<{ $immediate?: boolean }>`
+  ${baseButton}
+  ${linkStyles}
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.45);
+  box-shadow: none;
+  cursor: not-allowed;
+  pointer-events: none;
+  user-select: none;
+
+  &:hover,
+  &:active {
+    transform: none;
+    box-shadow: none;
+    background: rgba(255, 255, 255, 0.12);
+  }
+`;
+
 type CTAButtonProps = {
   theme: ThemeColor;
   children: ReactNode;
   onClick?: () => void;
   to?: string;
   immediate?: boolean;
+  disabled?: boolean;
 };
 
-export function CTAButton({ theme, children, onClick, to, immediate = false }: CTAButtonProps) {
+export function CTAButton({
+  theme,
+  children,
+  onClick,
+  to,
+  immediate = false,
+  disabled = false,
+}: CTAButtonProps) {
+  if (disabled) {
+    return (
+      <DisabledButton $immediate={immediate} aria-disabled="true">
+        {children}
+      </DisabledButton>
+    );
+  }
+
   if (to) {
     const LinkButton = theme === 'blue' ? BlueButtonLink : OrangeButtonLink;
     return (

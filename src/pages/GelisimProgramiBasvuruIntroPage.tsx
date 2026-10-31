@@ -1,5 +1,6 @@
 import { GradientTitle } from '../components/GradientTitle';
 import {
+  DisabledActionButton,
   PaymentActionRouterLink,
   PaymentContent,
   PaymentOptionCard,
@@ -7,6 +8,10 @@ import {
   ProductSubtitle,
 } from '../components/PaymentUI';
 import { DetailLayout } from '../components/PageLayout';
+import {
+  GELISIM_CAPACITY_FULL_MESSAGE,
+  useGelisimCapacity,
+} from '../lib/gelisimCapacity';
 import styled from 'styled-components';
 
 const Description = styled.p`
@@ -35,6 +40,8 @@ const Description = styled.p`
 `;
 
 export function GelisimProgramiBasvuruIntroPage() {
+  const { applicationsOpen } = useGelisimCapacity();
+
   return (
     <DetailLayout>
       <GradientTitle $detail>Gelişim Programı</GradientTitle>
@@ -42,23 +49,22 @@ export function GelisimProgramiBasvuruIntroPage() {
         <ProductSubtitle $theme="blue">Ücret: 6900₺ / ay</ProductSubtitle>
 
         <Description>
-          Başvurusu kabul edilen öğrenciler ödeme için yönlendirileceklerdir.
-          Henüz herhangi bir ödeme yapmayacaksınız.
+          {applicationsOpen
+            ? 'Başvurusu kabul edilen öğrenciler ödeme için yönlendirileceklerdir. Henüz herhangi bir ödeme yapmayacaksınız.'
+            : GELISIM_CAPACITY_FULL_MESSAGE}
         </Description>
-        {/* Closed-capacity copy — restore when applications close:
-        <Description>
-          Şu anda bütün kontenjanlarımız dolu. İlgilendiğin için teşekkürler.
-        </Description>
-        */}
 
         <PaymentOptionCard $theme="blue" $delay="0.6s">
           <PaymentOptionLabel>Başvurunu Yap</PaymentOptionLabel>
-          <PaymentActionRouterLink $theme="blue" to="/gelisim-programi/basvuru">
-            Formu Doldur
-          </PaymentActionRouterLink>
-          {/* Closed-capacity CTA — restore when applications close:
-          <DisabledActionButton>Kontenjan Dolu</DisabledActionButton>
-          */}
+          {applicationsOpen ? (
+            <PaymentActionRouterLink $theme="blue" to="/gelisim-programi/basvuru">
+              Formu Doldur
+            </PaymentActionRouterLink>
+          ) : (
+            <DisabledActionButton aria-disabled="true">
+              Kontenjan Dolu
+            </DisabledActionButton>
+          )}
         </PaymentOptionCard>
       </PaymentContent>
     </DetailLayout>
