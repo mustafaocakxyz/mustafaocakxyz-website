@@ -45,6 +45,7 @@ import {
 } from '../preview/AdminPreviewUi';
 import type { AdminChatInboxItem, ChatMessage, ChatMessageType, NumericStudentGrade, StudentGrade } from '../types';
 import { isNumericStudentGrade, studentClassPillLabel } from '../types';
+import { useChatListStickToBottom } from '../utils/chatListScroll';
 import { getCachedChatSignedUrlSync } from '../utils/chatSignedUrlCache';
 import { toDateKey } from '../utils/dates';
 import { computeCompletionPercent } from '../utils/taskLabel';
@@ -1024,8 +1025,11 @@ export function AdminChatPage() {
   const docInputRef = useRef<HTMLInputElement | null>(null);
   const inboxMenuRef = useRef<HTMLDivElement | null>(null);
   const selectedStudentIdRef = useRef<string | null>(null);
-  const stickToBottomRef = useRef(true);
   const loadingOlderRef = useRef(false);
+  const { stickToBottomRef, resetStick, onScroll } = useChatListStickToBottom(
+    listRef,
+    `${selectedStudentId ?? ''}:${chatLoading}`,
+  );
 
   const todayKey = useMemo(() => toDateKey(new Date()), []);
 
@@ -1173,7 +1177,7 @@ export function AdminChatPage() {
     setEditingMessageId(null);
     setEditDraft('');
     setPendingDeleteId(null);
-    stickToBottomRef.current = true;
+    resetStick();
 
     void (async () => {
       try {
@@ -1237,12 +1241,6 @@ export function AdminChatPage() {
       void cancelBrowserVoiceRecording();
     };
   }, [user, selectedStudentId]);
-
-  useEffect(() => {
-    const el = listRef.current;
-    if (!el || !stickToBottomRef.current) return;
-    el.scrollTop = el.scrollHeight;
-  }, [messages, chatLoading]);
 
   if (isLoading) {
     return (
@@ -1641,12 +1639,7 @@ export function AdminChatPage() {
               </ChatPanelHead>
               <MessageList
                 ref={listRef}
-                onScroll={(event) => {
-                  const el = event.currentTarget;
-                  stickToBottomRef.current =
-                    el.scrollHeight - el.scrollTop - el.clientHeight < 96;
-                  if (el.scrollTop < 80) void loadOlder();
-                }}
+                onScroll={(event) => onScroll(event, () => void loadOlder())}
               >
                 {loadingOlder ? <LoadingText>Eski mesajlar yükleniyor...</LoadingText> : null}
                 {!chatLoading && messages.length === 0 ? (

@@ -32,6 +32,7 @@ import {
   LoadingText,
 } from '../preview/AdminPreviewUi';
 import type { ChatMessage } from '../types';
+import { useChatListStickToBottom } from '../utils/chatListScroll';
 import { getCachedChatSignedUrlSync } from '../utils/chatSignedUrlCache';
 import {
   cancelBrowserVoiceRecording,
@@ -458,8 +459,11 @@ export function StudentChatPage() {
   const listRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const docInputRef = useRef<HTMLInputElement | null>(null);
-  const stickToBottomRef = useRef(true);
   const loadingOlderRef = useRef(false);
+  const { stickToBottomRef, resetStick, onScroll } = useChatListStickToBottom(
+    listRef,
+    `${threadId ?? ''}:${chatLoading}`,
+  );
 
   useEffect(() => {
     if (!user || user.role !== 'student') return;
@@ -473,7 +477,7 @@ export function StudentChatPage() {
     setMessages([]);
     setThreadId(null);
     setHasMore(false);
-    stickToBottomRef.current = true;
+    resetStick();
 
     void (async () => {
       try {
@@ -521,12 +525,6 @@ export function StudentChatPage() {
       void cancelBrowserVoiceRecording();
     };
   }, [user?.id, user?.role]);
-
-  useEffect(() => {
-    const el = listRef.current;
-    if (!el || !stickToBottomRef.current) return;
-    el.scrollTop = el.scrollHeight;
-  }, [messages, chatLoading]);
 
   const loadOlder = async () => {
     if (!threadId || loadingOlderRef.current || !hasMore || messages.length === 0) return;
@@ -680,12 +678,7 @@ export function StudentChatPage() {
             </ChatPanelHead>
             <MessageList
               ref={listRef}
-              onScroll={(event) => {
-                const el = event.currentTarget;
-                stickToBottomRef.current =
-                  el.scrollHeight - el.scrollTop - el.clientHeight < 96;
-                if (el.scrollTop < 80) void loadOlder();
-              }}
+              onScroll={(event) => onScroll(event, () => void loadOlder())}
             >
               {loadingOlder ? <LoadingText>Eski mesajlar yükleniyor...</LoadingText> : null}
               {!chatLoading && messages.length === 0 ? (
